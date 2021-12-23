@@ -12,6 +12,8 @@ from sklearn.cluster import DBSCAN
 import os
 
 
+MIN_SEG_LEN = 50
+
 class My_bkps():
     def __init__(self):
         self.all_bkp = []
@@ -82,10 +84,14 @@ class My_bkps():
             else:
                 start = 1
                 for pos in self.all_pos[ref]:
+                    if pos - start < MIN_SEG_LEN:
+                        continue
                     self.segments.append([ref, start, pos])
                     start = pos
-                self.segments.append([ref, start, self.ref_len[ref]])
+                if self.ref_len[ref] - start >= MIN_SEG_LEN:
+                    self.segments.append([ref, start, self.ref_len[ref]])
         # print (self.segments)
+        # self.remove_unmapped_segs()
         self.get_segments_fasta()
 
     def get_bed_file(self):
@@ -98,6 +104,25 @@ class My_bkps():
         self.get_bed_file()
         order = f"samtools faidx -r {bed_file} {ref_file} > {ref_seg_file}"
         os.system(order)
+
+    def remove_unmapped_segs(self):
+        for i in range(len(self.segments)):
+            self.segments[i].append(0)
+
+        for line in open(depth_file):
+            array = line.strip().split()
+            seg_name = array[0]
+            pos = int(array[1])
+            dp = int(array[2])
+            for i in range(len(self.segments)):
+                if self.segments[i][0] ==  seg_name and pos >= self.segments[i][1] and pos <= self.segments[i][2]:
+                    self.segments[i][3] += 1
+                    break
+        for i in range(len(self.segments)):
+            mapped_ratio = float(self.segments[i][3])/abs(self.segments[i][2]-self.segments[i][1])
+            print (self.segments[i], mapped_ratio)
+
+
 
 class Bkp_Record(object):
     def __init__(self, bkp_row):
@@ -123,6 +148,7 @@ class Bkp_Record(object):
 ref_file = sys.argv[1]
 ref_seg_file = sys.argv[2]
 acc_bkp_file = sys.argv[3]
+depth_file = sys.argv[4]
 
 bed_file = ref_file + ".bed"
 
