@@ -246,6 +246,8 @@ def add_support_split_reads(cluster, read_obj):
             break
     
 def extract_ref_seq(scaffold_name, start, end):
+    if start < 1:
+        start = 1
     return ref_fasta[scaffold_name][start:end].seq
 
 def find_accurate_bkp():
@@ -258,7 +260,7 @@ def find_accurate_bkp():
         # print (len(raw_bkp_clusters))
         for cluster in raw_bkp_clusters:
             if len(cluster.support_reads) == 0: # ignore the bkp not supported by split reads
-                print ("no reads", cluster.ref1, cluster.ref1_positions, cluster.ref2, cluster.ref2_positions)
+                # print ("no reads", cluster.ref1, cluster.ref1_positions, cluster.ref2, cluster.ref2_positions)
                 continue
             choose_acc_from_cluster(cluster)
             bkp_num_support += 1

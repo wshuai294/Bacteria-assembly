@@ -10,6 +10,8 @@ import argparse
 import sys
 from sklearn.cluster import DBSCAN
 import os
+from pysam import VariantFile
+import re
 
 
 MIN_SEG_LEN = 50
@@ -45,9 +47,51 @@ class My_bkps():
                 if row[0] == "from_ref": #header line
                     continue
                 one_bkp = Bkp_Record(row)
-                print(', '.join(row))
+                # print(', '.join(row))
                 self.add(one_bkp)
                 self.add_pos(one_bkp)
+
+    def read_lumpy_vcf(self):
+        # vcffile = "/mnt/d/breakpoints/assembly/simulation/assembly_test/test.sv.vcf"
+        vcffile = acc_bkp_file
+        for line in open(vcffile, "r"):
+            line = line.strip()
+            if line[0] == "#":
+                continue
+
+            # """
+            if re.search("IMPRECISE", line):
+                continue
+
+            len_r = re.search(";SVLEN=(.*?);", line)
+            array = line.split()
+            if len_r:
+                sv_len = abs(int(len_r.group(1)))
+                if sv_len < min_sv_len:
+                    continue
+                # print (sv_len)
+                # """
+                
+                chrom = array[0]
+                pos = int(array[1])
+                self.add_lumpy(chrom, pos)
+                if array[4] == "<DEL>" or array[4] == "<DUP>":
+                    pos_end = pos + sv_len
+                    self.add_lumpy(chrom, pos_end)
+            
+            else:
+                chrom = array[0]
+                pos = int(array[1])
+                self.add_lumpy(chrom, pos)
+
+
+
+
+    def add_lumpy(self, chrom, pos):
+        if chrom in self.all_pos.keys():
+            self.all_pos[chrom].append(pos)
+        else:
+            self.all_pos[chrom]=[pos]
 
     def cluster_pos(self):
         for ref in self.all_pos:
@@ -91,7 +135,7 @@ class My_bkps():
                 if self.ref_len[ref] - start >= MIN_SEG_LEN:
                     self.segments.append([ref, start, self.ref_len[ref]])
         # print (self.segments)
-        # self.remove_unmapped_segs()
+        self.remove_unmapped_segs()
         self.get_segments_fasta()
 
     def get_bed_file(self):
@@ -115,12 +159,16 @@ class My_bkps():
             pos = int(array[1])
             dp = int(array[2])
             for i in range(len(self.segments)):
-                if self.segments[i][0] ==  seg_name and pos >= self.segments[i][1] and pos <= self.segments[i][2]:
+                if self.segments[i][0] == seg_name and pos >= self.segments[i][1] and pos <= self.segments[i][2]:
                     self.segments[i][3] += 1
                     break
+        filtered_segments = []
         for i in range(len(self.segments)):
             mapped_ratio = float(self.segments[i][3])/abs(self.segments[i][2]-self.segments[i][1])
-            print (self.segments[i], mapped_ratio)
+            if mapped_ratio > min_mapped_ratio:
+                filtered_segments.append(self.segments[i])
+            # print (self.segments[i], mapped_ratio)
+        self.segments = filtered_segments
 
 
 
@@ -149,14 +197,24 @@ ref_file = sys.argv[1]
 ref_seg_file = sys.argv[2]
 acc_bkp_file = sys.argv[3]
 depth_file = sys.argv[4]
+lumpy = int(sys.argv[5])
 
 bed_file = ref_file + ".bed"
 
 
 
+min_sv_len = 100
+min_mapped_ratio = 0.5
 
-
-my_bkps = My_bkps()
-my_bkps.read_bkp()
-my_bkps.cluster_pos()
-my_bkps.get_segments()
+if lumpy == 0:
+    my_bkps = My_bkps()
+    my_bkps.read_bkp()
+    my_bkps.cluster_pos()
+    my_bkps.get_segments()
+elif lumpy == 1:
+    my_bkps = My_bkps()
+    my_bkps.read_lumpy_vcf()
+    my_bkps.cluster_pos()
+    my_bkps.get_segments()
+else:
+    print ("wrong arg")
