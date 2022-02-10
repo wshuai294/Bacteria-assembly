@@ -60,14 +60,15 @@ def assess():
     n50 = calculate_N50(match_list)
     fasta_len = get_fasta_len()
     completness = round(total_match_len/fasta_len, 2)
+    ID = sample.split("/")[-1]
     f = open(f"{sample}.assessment", "w")
-    print ("N50 is %s, Completeness is %s "%(n50, completness))
-    print ("N50 is %s, Completeness is %s "%(n50, completness), file = f)
+    print ("%s\tN50 is %s, Completeness is %s "%(ID, n50, completness))
+    print ("%s\tN50 is %s, Completeness is %s "%(ID, n50, completness), file = f)
     f.close()
 
         
 
     
 
-min_match_len = 10000
+min_match_len = 1000
 assess()

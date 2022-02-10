@@ -1,10 +1,6 @@
 import csv
 import pysam
 from pyfaidx import Fasta
-import skbio
-from skbio import DNA, TabularMSA
-from skbio.alignment import local_pairwise_align_ssw
-from skbio.alignment import StripedSmithWaterman
 import numpy as np
 import argparse
 import sys

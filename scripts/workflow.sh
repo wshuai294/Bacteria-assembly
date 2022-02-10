@@ -21,14 +21,22 @@ bwa mem -M -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
   | samtools view -bhS -> $sample.unsort.bam
 samtools sort -o $sample.bam $sample.unsort.bam
 
+# samtools index $sample.bam   ###consensus
+# freebayes -f $ref -p 1 $sample.bam >$sample.vcf
+# vcftools --vcf $sample.vcf --minQ 20 --recode --recode-INFO-all --out $sample.q20
+# bgzip -f $sample.q20.recode.vcf
+# tabix -f $sample.q20.recode.vcf.gz
+# cat $ref |bcftools consensus -H 1 $sample.q20.recode.vcf.gz >$sample.consensus.fasta
+
 
 samtools view -f 4 -bS $sample.bam > $sample.unmap.bam
 samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unmapped.s.fq -@ 8 $sample.unmap.bam
 gzip -f $sample.unmapped.*fq 
 rm -r $outdir/ass
 /home/wangshuai/miniconda3/bin/megahit --tmp-dir /tmp -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz \
--r $sample.unmapped.s.fq.gz -t 8 -o $outdir/ass 
+-r $sample.unmapped.s.fq.gz -t 8 -o $outdir/ass --min-contig-len 500
 cat $ref $outdir/ass/final.contigs.fa >$ins_ref
+# cat $sample.consensus.fasta $outdir/ass/final.contigs.fa >$ins_ref
 
 rm $sample.unsort.bam
 rm $sample.unmap.bam
@@ -44,7 +52,7 @@ rm $sample.unmapped*
 # Align the data
 bwa index $ins_ref
 samtools faidx $ins_ref
-bwa mem -R "@RG\tID:id\tSM:sample\tLB:lib" $ins_ref $fq1 $fq2 \
+bwa mem -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $ins_ref $fq1 $fq2 \
     | samblaster --excludeDups --addMateTags --maxSplitCount 2 --minNonOverlap 20 \
     | samtools view -S -b - \
     > $sample.bam
@@ -71,7 +79,7 @@ lumpyexpress \
     -o $sample.sv.vcf
 
 python3 $dir/ref_segment.py $ins_ref $seg_ref $sample.sv.vcf $sample.bam.depth 1
-rm $ins_ref*
+rm $ins_ref.*
 rm $sample.bam
 rm $sample.splitters*.bam
 rm $sample.discordants*.bam
@@ -151,10 +159,11 @@ rm $sample.contigs.bam*
 rm $sample.contigs.vcf
 ###########################consensus sequence###########################
 
-!
 
-mummer -mumreference -l 1000 -b -c $true $sample.contigs.consensus.fasta >$sample.mums
+
+mummer -maxmatch -l 1000 -b -c $true $sample.contigs.consensus.fasta >$sample.mums
 mummerplot -png -p $sample $sample.mums
+!
 # mummerplot -png -R $true -Q $sample.contigs.consensus.fasta -p $sample $sample.mums
 python3 $dir/measure.py $sample.mums $true $sample
 
