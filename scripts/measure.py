@@ -1,10 +1,13 @@
 import sys
 from Bio import SeqIO
+import re
+import csv
 
 
 mummer_alignment = sys.argv[1]
 true = sys.argv[2]
 sample = sys.argv[3]
+new_mummer_alignment = sys.argv[4]
 
 
 def get_fasta_len():
@@ -39,10 +42,11 @@ def calculate_N50(list_of_lengths):
     return median
 
 def read_mummer():
-
     match_list = []
     f = open(mummer_alignment)
     for line in f:
+        if line.strip() == '':
+            continue
         if line[0] == ">":
             continue
         array = line.strip().split()
@@ -54,7 +58,51 @@ def read_mummer():
     f.close()
     return match_list
 
+def revise_mummer():
+    match_list = []
+    f = open(mummer_alignment)
+    out = open(new_mummer_alignment, 'w')
+    writer = csv.writer(out, delimiter ='\t')
+    pre_array = []
+    
+    for line in f:
+        line = line.strip()
+        if line[0] == ">":
+            if len(pre_array) != 0:
+                # print (pre_array)
+                writer.writerow(pre_array)
+                pre_array = []
+            array = line.strip().split()
+            if array[-1] == "Reverse":
+                forward = False
+            else:
+                forward = True
+            print (line, file = out)
+            
+            continue
+        array = line.strip().split()  
+        if len(pre_array) != 0:
+            if forward:
+                gap = int(pre_array[0]) + int(pre_array[-1]) - int(array[0])
+            else:
+                gap = int(array[0]) - (int(pre_array[0]) - int(pre_array[-1]))
+            if gap >= 0:
+                pre_array[-1] = int(pre_array[-1])
+            elif  gap > tolerate_gap:
+                pre_array[-1] = int(pre_array[-1]) + int(array[-1]) 
+            else:
+                # print (pre_array)
+                writer.writerow(pre_array)
+                pre_array = array 
+        else:
+            pre_array = array 
+    writer.writerow(pre_array)
+    f.close()
+    out.close()
+    
+
 def assess():
+    revise_mummer()
     match_list = read_mummer()
     total_match_len = sum(match_list)
     n50 = calculate_N50(match_list)
@@ -69,6 +117,6 @@ def assess():
         
 
     
-
+tolerate_gap = -100
 min_match_len = 1000
 assess()

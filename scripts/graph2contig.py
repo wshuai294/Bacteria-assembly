@@ -16,6 +16,8 @@ def main():
     f = open(graph_file, 'r')
     contig_index = 1
     for line in f:
+        if line.strip() == '':
+            continue
         segs_list = line.strip().split()
 
         # if segs_list[0][-1] == "'": # check if the path is already recorded.
