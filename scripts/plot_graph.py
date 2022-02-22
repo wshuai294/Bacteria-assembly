@@ -30,10 +30,12 @@ def plot_net():
     first_partition_segs = {}
     for line in g:  
         array = line.strip().split()
-        seg1 = array[0]
-        node1 = array[0] + array[1]
-        seg2 = array[2]
-        node2 = array[2] + array[3]
+        if array[0] == "SEG":
+            continue
+        seg1 = array[1]
+        node1 = array[1] + array[2]
+        seg2 = array[3]
+        node2 = array[3] + array[4]
         if seg1 not in first_partition_segs and seg2 not in first_partition_segs:
             first_partition_segs[seg1] = 1
             first_partition_nodes.append(node1)

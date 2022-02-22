@@ -73,7 +73,7 @@ lumpyexpress \
     -o $sample.sv.vcf
 python3 $dir/ref_segment.py $ins_ref $origin_seg_ref $sample.sv.vcf $sample.bam.depth 1 $sample.sort.unique.bam
 
-!
+
 
 makeblastdb -in $origin_seg_ref -dbtype nucl -out $origin_seg_ref.db -parse_seqids
 blastn -query $origin_seg_ref -db $origin_seg_ref.db -outfmt 6 -out $origin_seg_ref.blast.out
@@ -100,7 +100,7 @@ rm $sample.discordants*.bam
 # -s $sample.splitters.bam -a $sample.raw.txt -o $sample.acc.txt
 # # !
 # python3 $dir/ref_segment.py $ins_ref $seg_ref $sample.acc.txt $sample.bam.depth 0
-
+!
 
 # :<<!
 ###########################bi matching###########################
@@ -120,15 +120,22 @@ else
       | samtools view -bhS -> $sample.seg.unsort.bam
     samtools sort -o $sample.seg.bam $sample.seg.unsort.bam
     samtools index $sample.seg.bam
+    samtools depth $sample.seg.bam >$sample.seg.bam.depth
 
     echo graph-building...
-    $dir/../seqGraph/build/rDistance $sample.seg.bam $sample.raw.graph.txt
+
     # dp=$(samtools depth $sample.seg.bam  |  awk '{sum+=$3} END { print sum/NR}')
+    # $dir/../seqGraph/build/rDistance -b $sample.seg.bam -o $sample.raw.graph.txt -d $dp -f
+    # $dir/../seqGraph/build/matching -g $sample.raw.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -i 10 -v 0
+
+
     # python3 $dir/filter_edge.py $sample.raw.graph.txt $sample.graph.txt $dp 0.2
-    python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt
-    # $dir/../seqGraph/build/matching $sample.graph.txt $sample.solve.match.txt $sample.solve.c.path.txt 10 0
-    # python3 $dir/bi_matching.py
+
+    python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
     python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
+    # python3 $dir/bi_matching.py $sample.graph.txt $sample.solve.path.txt
+    python3 $dir/dynamic_prog.py $sample.graph.txt $sample.solve.path.txt
+
     python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 
     rm $sample.seg.unsort.bam

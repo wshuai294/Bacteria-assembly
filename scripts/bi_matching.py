@@ -1,26 +1,34 @@
+import sys
+import copy
 
 
 
-graph_file = "/mnt/d/breakpoints/assembly/simulation/test/test.graph.txt"
-figure_file = "/mnt/d/breakpoints/assembly/simulation/test/test.graph.pdf"
-out_file = "/mnt/d/breakpoints/assembly/simulation/test/test.solve.path.txt"
+graph_file = sys.argv[1]
+out_file = sys.argv[2]
+# graph_file = "/mnt/d/breakpoints/assembly/simulation/test/test.graph.txt"
+# out_file = "/mnt/d/breakpoints/assembly/simulation/test/test.solve.path.txt"
 
 def read_graph():
     g = open(graph_file)
     graph = {}
     score = {}
+    copy_number = {}
     for line in g:  
         array = line.strip().split()
-        node1 = array[0] + array[1]
-        node2 = array[2] + array[3]
-        if node1 not in graph:
-            graph[node1] = [node2]
-            score[node1] = {node2:-1}
+        if array[0] == "SEG":
+            copy_number[array[1]+"+"] = int(array[2])
+            copy_number[array[1]+"-"] = int(array[2])
         else:
-            graph[node1] += [node2]
-            score[node1][node2] = -1
+            node1 = array[1] + array[2]
+            node2 = array[3] + array[4]
+            if node1 not in graph:
+                graph[node1] = [node2]
+                score[node1] = {node2:-1}
+            else:
+                graph[node1] += [node2]
+                score[node1][node2] = -1
     g.close()
-    return graph, score
+    return graph, score, copy_number
 
 def find_start(graph):
     in_num = {}
@@ -55,9 +63,13 @@ def update_graph(graph, paths):
     for node in graph:
         if node in record:
             continue
+        if copy_number[node] == 0:
+            continue
         new_graph[node] = []
         for near in graph[node]:
             if near in record:
+                continue
+            if copy_number[near] == 0:
                 continue
             new_graph[node].append(near)
     return new_graph
@@ -87,7 +99,6 @@ def BFS(graph, node, seg_list, record):
             return 1
 
 def remove_repeat_segs(paths):
-    print ("000")
     flag = True
     if len(paths) > 1:
         while flag:
@@ -101,8 +112,10 @@ def remove_repeat_segs(paths):
     for p in paths:
         for seg in p:
             if origin_copy_number[seg] > 0:
-                origin_copy_number[seg[:-1]+"+"] -= 1
-                origin_copy_number[seg[:-1]+"-"] -= 1
+                if seg[:-1]+"+" in origin_copy_number:
+                    origin_copy_number[seg[:-1]+"+"] -= 1
+                if seg[:-1]+"-" in origin_copy_number:
+                    origin_copy_number[seg[:-1]+"-"] -= 1
                 print (seg, end = "\t", file = f)
                 print (seg, end = "\t")
         print ('', file = f)
@@ -123,11 +136,14 @@ def simu_copy():
                 copy_number[near] = 2
     return copy_number
 
-def dynamic_programming(node, node_num):
-    # print (node)
+def dynamic_programming_BK(node, node_num):
+    print (node, copy_number[node], node_num)
     if copy_number[node] == 0:
         return node_num
-    copy_number[node] -= 1
+    if node[:-1]+"+" in copy_number:
+        copy_number[node[:-1]+"+"] -= 1
+    if node[:-1]+"-" in copy_number:
+        copy_number[node[:-1]+"-"] -= 1
     if node not in graph or len(graph[node]) == 0:      
         return node_num+1
     max_num = 0
@@ -135,50 +151,95 @@ def dynamic_programming(node, node_num):
         test_node_num = dynamic_programming(near, node_num)
         # print (near, test_node_num)
         if test_node_num >= max_num:
-            max_num = test_node_num
             next_node = near
+            max_num = test_node_num
     node_num = max_num + 1
     score[node][next_node] = node_num
     return node_num
 
-def trace_back(begin_node, score):
+def dynamic_programming(node, node_num):
+    print (node, copy_number[node], node_num)
+    if copy_number[node] == 0:
+        return node_num
+    if node[:-1]+"+" in copy_number:
+        copy_number[node[:-1]+"+"] -= 1
+    if node[:-1]+"-" in copy_number:
+        copy_number[node[:-1]+"-"] -= 1
+    if node not in graph or len(graph[node]) == 0:      
+        return node_num+1
+    max_num = 0
+    for near in graph[node]:
+        test_node_num = dynamic_programming(near, node_num)
+        # print (near, test_node_num)
+        if test_node_num >= max_num:
+            next_node = near
+            max_num = test_node_num
+    node_num = max_num + 1
+    score[node][next_node] = node_num
+    
+    return node_num
+
+def trace_back(begin_node, score, trace_copy_number):
+    
     path = [begin_node]
     while True:
+        
         if begin_node not in score:
             break
+        if trace_copy_number[begin_node] <= 0:
+            break
+        print ("a", begin_node, score[begin_node])
+        trace_copy_number[begin_node] -= 1
         next_node = ''
         next_num = -1
+        flag = False
         for near in score[begin_node]:
             if score[begin_node][near] >= next_num:
                 next_num = score[begin_node][near]
                 next_node = near
+                flag = True
+        if flag == False:
+            break
+        del score[begin_node][next_node]
         path.append(next_node)
         begin_node = next_node
-    print (path)
+        # print (len(path))
+        # print (score[begin_node], trace_copy_number[begin_node])
     return path
 
     
 
 
-graph, score = read_graph()
-copy_number = simu_copy()
-origin_copy_number = copy_number.copy()
+graph, score, copy_number = read_graph()
+# graph = {"1+":["5+"], "2+":["5+"], "5+":["3+", "2+"]}
+# score = {"1+":[{"5+":-1}], "2+":[{"5+":-1}], "5+":[{"3+":-1, "2+":-1}, {"3+":-1, "2+":-1}]}
+# copy_number = {"1+":1, "2+":1, "3+": 1,  "4+": 1, "5+":2}
+
+# graph = {"1+":["5+"], "2+":["5+"], "5+":["3+", "2+"]}
+# score = {"1+":{"5+":-1}, "2+":{"5+":-1}, "5+":{"3+":-1, "2+":-1}}
+# copy_number = {"1+":1, "2+":1, "3+": 1,  "4+": 1, "5+":2}
+
+# copy_number = simu_copy()
+origin_copy_number = copy.deepcopy(copy_number)
 paths = []
+graph = update_graph(graph, paths)
 
 while len(graph) > 0:
+    print ("iteration*********")
     begin_node, record, seg_list = given_graph(graph)
     start_node = begin_node
-    # print ("begin", begin_node, "-------------", graph)
-
+    trace_copy_number = copy.deepcopy(copy_number)
     node_num = 0
     node_num = dynamic_programming(begin_node, node_num)
-    path = trace_back(begin_node, score)
+    print ("==")
+    print (score)
+    path = trace_back(begin_node, score, trace_copy_number)
+    # print (score)
     
     paths.append(path)
     graph = update_graph(graph, paths)
 
 print ("finish---------")
-print (origin_copy_number)
 remove_repeat_segs(paths)
 
 

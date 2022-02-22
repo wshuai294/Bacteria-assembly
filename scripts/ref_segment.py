@@ -235,7 +235,7 @@ class My_bkps():
             mapped_ratio = float(self.segments[i][3])/abs(self.segments[i][2]-self.segments[i][1])
             if mapped_ratio > min_mapped_ratio:
                 filtered_segments.append(self.segments[i])
-            print (self.segments[i], mapped_ratio)
+            # print (self.segments[i], mapped_ratio)
         self.segments = filtered_segments
         print ("unmapping removed")
 

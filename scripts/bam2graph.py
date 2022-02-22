@@ -55,15 +55,45 @@ def calCrossReads(bam_name):
             edge_dict[edge] = 1
         else:
             edge_dict[edge] += 1
-
+    for chrom in chrom_copy:
+        # print ("#\t", chrom, chrom_copy[chrom])
+        print ("SEG\t", chrom, chrom_copy[chrom], file = f)
     for edge in edge_dict:
-        print (edge, edge_dict[edge], file = f)
-        print (edge, edge_dict[edge])
+        if edge_dict[edge] < min_dp:
+            continue
+        print ("JUNC\t", edge, edge_dict[edge], file = f)
+        # print (edge, edge_dict[edge])
+
     f.close()
+
+def cal_copy_number():
+    f = open(depth_file, 'r')
+    depth_dict = {}
+    all_depth = []
+    for line in f:
+        array = line.strip().split()
+        chrom = array[0]
+        pos = int(array[1])
+        depth = int(array[2])
+        if chrom not in depth_dict:
+            depth_dict[chrom] = []
+        depth_dict[chrom].append(depth)
+        all_depth.append(depth)
+    f.close()
+    median_depth = np.median(all_depth)
+    chrom_copy = {} 
+    for chrom in depth_dict:
+        chrom_copy[chrom] = round(float(np.median(depth_dict[chrom]))/median_depth)
+    return chrom_copy, median_depth
 
 
 min_q = 20
+min_dp_ratio = 0.3
 bam_name = sys.argv[1]
 graph = sys.argv[2]
+depth_file = sys.argv[3]
 print ("start extract edges...")
+chrom_copy, median_depth = cal_copy_number()
+print ("median depth:", median_depth)
+min_dp = min_dp_ratio * median_depth
 calCrossReads(bam_name)
