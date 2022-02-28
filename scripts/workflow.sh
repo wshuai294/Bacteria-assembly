@@ -16,7 +16,7 @@ start=$(date +%s)
 bwa_score=60 #default 30
 map_qual=20
 
-# :<<!
+:<<!
 
 ##########################assemble unmapped#################################
 bwa index $ref
@@ -42,9 +42,9 @@ rm $sample.unmap.bam
 ##########################assemble unmapped#################################
 
 
+!
 
-
-# :<<!
+# :<<!  
 ##########################lumpy#################################
 # Align the data
 bwa index $ins_ref
@@ -125,7 +125,7 @@ else
     echo graph-building...
 
     # dp=$(samtools depth $sample.seg.bam  |  awk '{sum+=$3} END { print sum/NR}')
-    # $dir/../seqGraph/build/rDistance -b $sample.seg.bam -o $sample.raw.graph.txt -d $dp -f
+    # $dir/../seqGraph/build/rDistance -b $sample.seg.bam -o $sample.raw.graph.txt -d $dp
     # $dir/../seqGraph/build/matching -g $sample.raw.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -i 10 -v 0
 
 
@@ -133,8 +133,9 @@ else
 
     python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
     python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
+    # $dir/../seqGraph/build/matching -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -i 10 -v 0 -m $sample.new.graph.txt --break_c
     # python3 $dir/bi_matching.py $sample.graph.txt $sample.solve.path.txt
-    python3 $dir/dynamic_prog.py $sample.graph.txt $sample.solve.path.txt
+    python3 $dir/dynamic_prog.py $sample.graph.txt $sample.solve.path.txt 
 
     python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 

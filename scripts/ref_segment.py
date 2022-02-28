@@ -342,6 +342,7 @@ elif lumpy == 1:
     my_bkps = My_bkps()
     my_bkps.read_lumpy_vcf()
     # my_bkps.breakpoint_in_bam()
+    # my_bkps.add_lumpy("NC_000913.3", 2948733)
     my_bkps.cluster_pos()
     my_bkps.get_segments()
 else:

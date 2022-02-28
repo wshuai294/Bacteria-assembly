@@ -58,9 +58,12 @@ def calCrossReads(bam_name):
     for chrom in chrom_copy:
         # print ("#\t", chrom, chrom_copy[chrom])
         print ("SEG\t", chrom, chrom_copy[chrom], file = f)
+    remove_edges = remove_small_circle(edge_dict)
     for edge in edge_dict:
         if edge_dict[edge] < min_dp:
             continue
+        # if edge in remove_edges:
+        #     continue
         print ("JUNC\t", edge, edge_dict[edge], file = f)
         # print (edge, edge_dict[edge])
 
@@ -87,8 +90,38 @@ def cal_copy_number():
     return chrom_copy, median_depth
 
 
+def remove_small_circle(edge_dict):
+    my_graph = {}
+    for edge in edge_dict:
+        array = edge.split()
+        node1 = array[0] + " " + array[1]
+        node2 = array[2] + " " + array[3]
+        if node1 not in my_graph:
+            my_graph[node1] = [node2]
+        else:
+            my_graph[node1] += [node2]
+    remove_edges = {}
+    for node1 in my_graph:
+        if len(my_graph[node1]) == 1:
+            pass
+        else:
+            remove_edge = []
+            for node2 in my_graph[node1]:
+                if node2 not in my_graph:
+                    continue
+                else:
+                    for node3 in my_graph[node2]:
+                        if node3 in my_graph[node1]:
+                            edge = node1 + " " + node3
+                            remove_edges[edge] = 1
+    return remove_edges
+
+
+
+
+
 min_q = 20
-min_dp_ratio = 0.3
+min_dp_ratio = 0.1 #0.3
 bam_name = sys.argv[1]
 graph = sys.argv[2]
 depth_file = sys.argv[3]

@@ -4,16 +4,15 @@ import sys
 
 
 
-graph_file = sys.argv[1]
-out_file = sys.argv[2]
+
 
 # graph = {"1+":["5+"], "2+":["5+"], "5+":["3+", "2+"]}
 # score = {"1+":{"5+":-1}, "2+":{"5+":-1}, "5+":{"3+":-1, "2+":-1}}
 # copy_number = {"1+":1, "2+":1, "3+": 1,  "4+": 1, "5+":2}
 
-graph = {"1+":["2+"], "2+":["3+"], "3+":["4+", "5+"], "4+":["6+"], "5+":["8+"]}
-# score = {"1+":{"5+":-1}, "2+":{"5+":-1}, "5+":{"3+":-1, "2+":-1}}
-copy_number = {"1+":1, "2+":1, "3+": 3,  "4+": 1, "5+":1, "6+":1, "8+":1}
+# graph = {"1+":["2+"], "2+":["3+"], "3+":["4+", "5+"], "4+":["3+"]}
+# # score = {"1+":{"5+":-1}, "2+":{"5+":-1}, "5+":{"3+":-1, "2+":-1}}
+# copy_number = {"1+":1, "2+":1, "3+": 2,  "4+": 1, "5+":1}
 
 def read_graph():
     g = open(graph_file)
@@ -35,12 +34,19 @@ def read_graph():
     return graph, copy_number
 
 def DFS(node, path, paths, copy_number):
+    # print (paths, path, node)
     if copy_number[node] == 0:
-        path.append(node)
+        paths.append(path)
+        # path.append(node)
         return 0
-    # print (paths, node)
+
     path.append(node)
-    copy_number[node] -= 1
+    # copy_number[node] -= 1
+    if node[:-1]+"+" in copy_number:
+        copy_number[node[:-1]+"+"] -= 1
+    if node[:-1]+"-" in copy_number:
+        copy_number[node[:-1]+"-"] -= 1
+
     if node not in graph:
         # print (path, paths)
         paths.append(path)
@@ -63,20 +69,10 @@ def find_start(graph):
             else:
                 in_num[near] = 1
     for node in graph:
-        if node not in in_num:
+        if node not in in_num and copy_number[node] > 0:
             return node
     return list(graph.keys())[0]
 
-def given_graph(graph):
-    # print (graph)
-    begin_node = find_start(graph)
-    record = {}
-    for node in graph:
-        record[node] = -1
-        for near in graph[node]:
-            record[near] = -1
-    seg_list = []
-    return begin_node, record, seg_list
 
 def update_graph(graph, paths):
     new_graph = {}
@@ -85,26 +81,30 @@ def update_graph(graph, paths):
         for p in range(1, len(path)):
             from_node = path[p-1] 
             to_node = path[p]
-    #         record[p] = 1
-    # for node in graph:
-    #     if node in record:
-    #         continue
-    #     if copy_number[node] == 0:
-    #         continue
-    #     new_graph[node] = []
-    #     for near in graph[node]:
-    #         if near in record:
-    #             continue
-    #         if copy_number[near] == 0:
-    #             continue
-    #         new_graph[node].append(near)
-    # return new_graph
+            if from_node not in record:
+                record[from_node] = [to_node]
+            else:
+                record[from_node] += [to_node]
+    for node in graph:
+        if copy_number[node] == 0:
+            continue
+        elif node not in record:
+            new_graph[node] = graph[node]
+    
+        else:
+            new_next = []
+            for near in graph[node]:
+                if near not in record[node] and copy_number[near] > 0:
+                    new_next.append(near)
+            if len(new_next) > 0:
+                new_graph[node] = new_next
+    return new_graph
 
 def get_longest(paths):
     longest_path = ''
     max_len = 0
     for p in paths:
-        if len(p) >= max_len:
+        if len(p) > max_len:
             max_len = len(p)
             longest_path = p
     return longest_path
@@ -121,6 +121,7 @@ def remove_repeat_segs(paths):
                     paths[i+1] = a
     f = open(out_file, 'w')
     for p in paths:
+        # print ("len", len(p))
         for seg in p:
             if origin_copy_number[seg] > 0:
                 if seg[:-1]+"+" in origin_copy_number:
@@ -133,26 +134,36 @@ def remove_repeat_segs(paths):
         print ('')
     f.close()
 
-# node = "1+"
+
+
+graph_file = sys.argv[1]
+out_file = sys.argv[2]
 final_paths = []
-# graph, copy_number = read_graph()
+graph, copy_number = read_graph()
 origin_copy_number = copy.deepcopy(copy_number)
+for p in graph:
+    print (p, len(graph[p]), copy_number[p])
 
 
 while len(graph) > 0:
-    print ("iteration*********")
+    
     path = []
     paths = []
     
-    node, record, seg_list = given_graph(graph)
+    node = find_start(graph)
     # print (path, )
+    print ("iteration*********", node, copy_number[node], graph[node])
     DFS(node, path, paths, copy_number)
     longest_pa = get_longest(paths)
     final_paths.append(longest_pa)
     graph = update_graph(graph, final_paths)
     # print (paths)
+    # print ("paths:")
+    for p in paths:
+        print (len(p), p[:15])
 # print (final_paths)
-    print (final_paths, graph, origin_copy_number)
+    # print (len(final_paths), len(graph))
 print ("finish---------")
+# print (final_paths)
 remove_repeat_segs(final_paths)
 
