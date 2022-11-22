@@ -43,7 +43,7 @@ def calculate_N50(list_of_lengths):
 
 def read_mummer():
     match_list = []
-    f = open(mummer_alignment)
+    f = open(new_mummer_alignment)
     for line in f:
         if line.strip() == '':
             continue
@@ -81,6 +81,7 @@ def revise_mummer():
             
             continue
         array = line.strip().split()  
+        # print (array, pre_array)
         if len(pre_array) != 0:
             if forward:
                 gap = int(pre_array[0]) + int(pre_array[-1]) - int(array[0])
@@ -116,7 +117,7 @@ def assess():
 
         
 
-    
-tolerate_gap = -100
-min_match_len = 1000
-assess()
+if __name__ == "__main__":  
+    tolerate_gap = -200
+    min_match_len = 1000
+    assess()

@@ -9,6 +9,8 @@ import os
 from pysam import VariantFile
 import re
 
+from find_INS_breakpoints import ins_bps
+
 
 
 
@@ -76,8 +78,6 @@ class My_bkps():
             # """
             if re.search("IMPRECISE", line):
                 continue
-
-
             len_r = re.search(";SVLEN=(.*?);", line)
             array = line.split()
             if len_r:
@@ -115,6 +115,54 @@ class My_bkps():
         
                 self.add_lumpy(chrom, pos)
 
+    def read_delly_vcf(self):
+        # vcffile = "/mnt/d/breakpoints/assembly/simulation/assembly_test/test.sv.vcf"
+        vcffile = acc_bkp_file
+        if not os.path.isfile(vcffile):
+            print ("no sv vcf.")
+            return 0
+        for line in open(vcffile, "r"):
+            line = line.strip()
+            if line[0] == "#":
+                continue
+
+            # """
+            if re.search("IMPRECISE", line):
+                continue
+            # len_r = re.search(";SVLEN=(.*?);", line)
+            end_pos=re.search(";END=(.*?);", line)
+            array = line.split()
+            chrom = array[0]
+            pos = int(array[1])
+
+            if not re.search("SVTYPE=BND", line):
+                sv_len = abs(int(end_pos.group(1)) - pos)
+                if sv_len < min_sv_len:
+                    continue
+                self.add_lumpy(chrom, pos)
+                if array[4] == "<DEL>" or array[4] == "<DUP>":
+                    pos_end = pos + sv_len
+                    self.add_lumpy(chrom, pos_end)
+            
+            else:
+                fir = re.search("\[(.*?)\[", array[4])
+                sec = re.search("](.*?)]", array[4])
+                if fir:
+                    other_end = fir.group(1)
+                else:
+                    other_end = sec.group(1)
+                locus_info = other_end.split(":")
+                chrom2 = locus_info[0]
+                pos2 = int (locus_info[1])
+                # print (array[4], chrom, pos, abs(pos2 - pos))
+                if chrom2 == chrom and abs(pos2 - pos) < min_sv_len:
+                    continue
+
+    def read_additional_ins_pos(self): # scan reads, find clipped reads
+        cluster_central = ins_bps(bam_file)
+        for central in cluster_central:
+            self.add_lumpy(central[0], central[1])
+
     def add_lumpy(self, chrom, pos):
         if chrom in self.all_pos.keys():
             self.all_pos[chrom].append(pos)
@@ -127,6 +175,7 @@ class My_bkps():
             ref_pos_list = self.all_pos[ref]
             ref_rep_pos_list = self.dbscan_clu(ref_pos_list)
             self.all_pos[ref] = ref_rep_pos_list
+            # print (self.all_pos)
 
     def dbscan_clu(self, ref_pos_list):
         
@@ -172,14 +221,19 @@ class My_bkps():
         self.get_segments_fasta()
 
     def get_bed_file(self):
+        intervals = ""
         fout = open(bed_file, 'w')
         for seg in self.segments:
             print (f"{seg[0]}:{seg[1]}-{seg[2]}", file = fout)
+            intervals += f"{seg[0]}:{seg[1]}-{seg[2]} "
         fout.close()
+        return intervals
 
     def get_segments_fasta(self):
-        self.get_bed_file()
-        order = f"samtools faidx -r {bed_file} {ref_file} > {ref_seg_file}"
+        intervals = self.get_bed_file()
+        # order = f"samtools faidx -r {bed_file} {ref_file} > {ref_seg_file}"
+        order = f"samtools faidx {ref_file} {intervals}> {ref_seg_file}"
+        print (order)
         os.system(order)
 
     def remove_unmapped_segs_BK(self):
@@ -221,7 +275,10 @@ class My_bkps():
             depth_array.append(dp)
         # min_depth = 0
         # min_depth = np.mean(depth_array) - 5 * np.std(depth_array)
-        print ("Median depth:", np.median(depth_array))
+        if len(depth_array) == 0:
+            print ("No reads mapped to the original reference.")
+        else:
+            print ("Median depth:", np.median(depth_array))
         for i in range(len(self.segments)):
             self.segments[i].append(0) #to record hit num
             seg_name = self.segments[i][0]
@@ -314,36 +371,40 @@ class Bkp_Record(object):
 # acc_bkp_file = "/mnt/d/breakpoints/assembly/simulation/ASM59784v1.acc.txt"
 
 
-ref_file = sys.argv[1]
-ref_seg_file = sys.argv[2]
-acc_bkp_file = sys.argv[3]
-depth_file = sys.argv[4]
-lumpy = int(sys.argv[5])
-bam_file = sys.argv[6]
+if __name__ == "__main__":
 
-bed_file = ref_file + ".bed"
+    ref_file = sys.argv[1]
+    ref_seg_file = sys.argv[2]
+    acc_bkp_file = sys.argv[3]
+    depth_file = sys.argv[4]
+    lumpy = int(sys.argv[5])
+    bam_file = sys.argv[6]
 
-
-min_gap = 20
-MIN_SEG_LEN = 50
-min_sv_len = MIN_SEG_LEN
-min_exist_len = MIN_SEG_LEN
-min_mapped_ratio = 0.8
-max_chrom_len = 10000000
+    bed_file = ref_file + ".bed"
 
 
-print ("seperate reference...")
-if lumpy == 0:
-    my_bkps = My_bkps()
-    my_bkps.read_bkp()
-    my_bkps.cluster_pos()
-    my_bkps.get_segments()
-elif lumpy == 1:
-    my_bkps = My_bkps()
-    my_bkps.read_lumpy_vcf()
-    # my_bkps.breakpoint_in_bam()
-    # my_bkps.add_lumpy("NC_000913.3", 2948733)
-    my_bkps.cluster_pos()
-    my_bkps.get_segments()
-else:
-    print ("wrong arg")
+    min_gap = 20
+    MIN_SEG_LEN = 50  #50
+    min_sv_len = MIN_SEG_LEN
+    min_exist_len = MIN_SEG_LEN
+    min_mapped_ratio = 0.8
+    max_chrom_len = 10000000
+
+
+    print ("separate reference...")
+    if lumpy == 0:
+        my_bkps = My_bkps()
+        my_bkps.read_bkp()
+        my_bkps.cluster_pos()
+        my_bkps.get_segments()
+    elif lumpy == 1:
+        my_bkps = My_bkps()
+        my_bkps.read_delly_vcf()
+        my_bkps.read_additional_ins_pos() # find some ins breakpoints by clipped reads
+        # my_bkps.read_lumpy_vcf()
+        # my_bkps.breakpoint_in_bam()
+        # my_bkps.add_lumpy("NC_000913.3", 2948733)
+        my_bkps.cluster_pos()
+        my_bkps.get_segments()
+    else:
+        print ("wrong arg")

@@ -31,12 +31,28 @@ def calCrossReads(bam_name):
         if (read.reference_name == read.next_reference_name):
             continue
 
-        ref_len = int(read.reference_name.split(':')[1].split('-')[1]) - int(read.reference_name.split(':')[1].split('-')[0])
-        mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
+        if len(read.reference_name.split(':')) < 2:
+            ref_len = int(read.reference_name.split('_')[3])
+        else:
+            ref_len = int(read.reference_name.split(':')[1].split('-')[1]) - int(read.reference_name.split(':')[1].split('-')[0])
+            
+        
+        if len(read.next_reference_name.split(':')) < 2:
+            mate_len = int(read.next_reference_name.split('_')[3])
+        else:
+            mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
+
 
         if not (abs(read.reference_start) < insert_size or abs(ref_len - read.reference_start)< insert_size):
             continue
         if not (abs(read.next_reference_start) < insert_size or abs(mate_len - read.next_reference_start)< insert_size):
+            continue
+
+        if read.reference_name not in chrom_copy or read.next_reference_name not in chrom_copy:
+            print ("WARNING: JUNC not in SEG!!!", read.reference_name, read.next_reference_name)
+            sys.exit()
+        if  chrom_copy[read.reference_name] == 0 or  chrom_copy[read.next_reference_name] == 0:
+            print ("The copy of one seg is zero in the edge, thus deleted.", read.reference_name, read.next_reference_name)
             continue
 
         if read.is_reverse:
@@ -47,7 +63,6 @@ def calCrossReads(bam_name):
             mate_ref = read.next_reference_name + " -"
         else:
             mate_ref = read.next_reference_name + " +"
-           
 
         edge = refname + " " + mate_ref
 
@@ -55,16 +70,23 @@ def calCrossReads(bam_name):
             edge_dict[edge] = 1
         else:
             edge_dict[edge] += 1
+        
+    # remove_edges, my_nodes = remove_small_circle(edge_dict)   
+    remove_edges, my_nodes = {}, {}
     for chrom in chrom_copy:
         # print ("#\t", chrom, chrom_copy[chrom])
-        print ("SEG\t", chrom, chrom_copy[chrom], file = f)
-    remove_edges = remove_small_circle(edge_dict)
+        if chrom_copy[chrom] > 0:
+            print ("SEG ", chrom, round(chrom_depth[chrom]), chrom_copy[chrom], 0, 1, file = f)
+        else:
+            print ("Copy of SEG %s is zero, thus deleted."%(chrom))
+    
+
     for edge in edge_dict:
         if edge_dict[edge] < min_dp:
             continue
-        # if edge in remove_edges:
-        #     continue
-        print ("JUNC\t", edge, edge_dict[edge], file = f)
+        if edge in remove_edges:
+            continue
+        print ("JUNC ", edge, round(edge_dict[edge]), file = f)
         # print (edge, edge_dict[edge])
 
     f.close()
@@ -85,17 +107,21 @@ def cal_copy_number():
     f.close()
     median_depth = np.median(all_depth)
     chrom_copy = {} 
+    chrom_depth = {}
     for chrom in depth_dict:
+        chrom_depth[chrom] = np.median(depth_dict[chrom])
         chrom_copy[chrom] = round(float(np.median(depth_dict[chrom]))/median_depth)
-    return chrom_copy, median_depth
-
+    return chrom_copy, median_depth, chrom_depth
 
 def remove_small_circle(edge_dict):
     my_graph = {}
+    my_nodes = {}
     for edge in edge_dict:
         array = edge.split()
         node1 = array[0] + " " + array[1]
         node2 = array[2] + " " + array[3]
+        my_nodes[array[0]] = 1
+        my_nodes[array[2]] = 1
         if node1 not in my_graph:
             my_graph[node1] = [node2]
         else:
@@ -114,19 +140,19 @@ def remove_small_circle(edge_dict):
                         if node3 in my_graph[node1]:
                             edge = node1 + " " + node3
                             remove_edges[edge] = 1
-    return remove_edges
+    return remove_edges, my_nodes
 
 
 
+if __name__ == "__main__":
 
-
-min_q = 20
-min_dp_ratio = 0.1 #0.3
-bam_name = sys.argv[1]
-graph = sys.argv[2]
-depth_file = sys.argv[3]
-print ("start extract edges...")
-chrom_copy, median_depth = cal_copy_number()
-print ("median depth:", median_depth)
-min_dp = min_dp_ratio * median_depth
-calCrossReads(bam_name)
+    min_q = 20
+    min_dp_ratio = 0.1 #0.3
+    bam_name = sys.argv[1]
+    graph = sys.argv[2]
+    depth_file = sys.argv[3]
+    print ("start extract edges...")
+    chrom_copy, median_depth, chrom_depth = cal_copy_number()
+    print ("median depth:", median_depth)
+    min_dp = min_dp_ratio * median_depth
+    calCrossReads(bam_name)

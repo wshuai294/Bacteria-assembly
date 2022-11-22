@@ -104,7 +104,7 @@ def get_longest(paths):
     longest_path = ''
     max_len = 0
     for p in paths:
-        if len(p) > max_len:
+        if len(p) >= max_len:
             max_len = len(p)
             longest_path = p
     return longest_path
