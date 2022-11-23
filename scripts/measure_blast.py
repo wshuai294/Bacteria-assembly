@@ -1,12 +1,15 @@
 """
-compute N50 based on the blast result
+compute N50 based on the blast and minimap2 results
 Nov 21, 2022
+
+PAF formate: https://github.com/lh3/miniasm/blob/master/PAF.md
 """
 
 import sys
 from Bio import SeqIO
 import re
 import csv
+import os
 
 def calculate_N50(list_of_lengths):
     """Calculate N50 for a sequence of numbers.
@@ -31,9 +34,11 @@ def calculate_N50(list_of_lengths):
     return median
 
 def read_blast(blast_file): # outfmt 7
+    blast()
     # save the mapped interval of each contigs
     # for spliting the original contigs 
     contig_dict = {}
+    truth_dict = {}
     f = open(blast_file, 'r')
     for line in f:
         if line[0] == "#":
@@ -44,14 +49,23 @@ def read_blast(blast_file): # outfmt 7
         if abs(q_start - q_end) < min_map_len:
             continue
         contig_name = array[0]
+        truth_name = array[1]
         if contig_name not in contig_dict:
             contig_dict[contig_name] = []
+        if truth_name not in truth_dict:
+            truth_dict[truth_name] = []
+
         if q_start > q_end:
             a = q_end.copy()
             q_end = q_start
             q_start = a
         contig_dict[contig_name].append([q_start, q_end])
-    return contig_dict
+
+        if int(array[8]) > int(array[9]):
+            truth_dict[truth_name].append([int(array[9]), int(array[8])])
+        else:
+            truth_dict[truth_name].append([int(array[8]), int(array[9])])
+    return contig_dict, truth_dict
 
 def sort_interval(interval_list):
     if len(interval_list) < 2:
@@ -84,43 +98,85 @@ def merge_interval(interval_list):
                 break
     return interval_list
 
-
-def get_fasta_len():
+def get_fasta_len(fasta):
     fasta_len = 0
-    with open(true) as handle:
+    with open(fasta) as handle:
         for record in SeqIO.parse(handle, "fasta"):
             # print(record.id)
             fasta_len += len(record.seq)
     return fasta_len
 
-def main():
+def main_blast():
     list_of_lengths = []
     for contig in contig_dict:
         interval_list = contig_dict[contig]
-        print (interval_list)
         interval_list = sort_interval(interval_list)
-        print (interval_list)
         interval_list = merge_interval(interval_list)
-        print (interval_list)
         for interval in interval_list:
             list_of_lengths.append(interval[1] - interval[0])
 
     total_match_len = sum(list_of_lengths)
     n50 = calculate_N50(list_of_lengths)
-    fasta_len = get_fasta_len()
-    completness = round(total_match_len/fasta_len, 2)
-    ID = sample.split("/")[-1]
-    f = open(f"{sample}.assessment", "w")
-    print ("%s\tN50 is %s, Completeness is %s "%(ID, n50, completness))
-    print ("%s\tN50 is %s, Completeness is %s "%(ID, n50, completness), file = f)
-    f.close()
+    result_fasta_len = get_fasta_len(result_fasta)
+    precision = round(total_match_len/result_fasta_len, 2)
+
+    true_list_of_lengths = []
+    for contig in truth_dict:
+        interval_list = truth_dict[contig]
+        interval_list = sort_interval(interval_list)
+        interval_list = merge_interval(interval_list)
+        for interval in interval_list:
+            true_list_of_lengths.append(interval[1] - interval[0])
+    truth_match_len = sum(true_list_of_lengths)
+    truth_n50 = calculate_N50(true_list_of_lengths)
+    result_fasta_len = get_fasta_len(result_fasta)
+    true_fasta_len = get_fasta_len(true)
+    recall = round(truth_match_len/true_fasta_len, 2)
+    return ID, round(n50), precision, recall, round(truth_n50)
+    
+
+
+def blast():
+    command = """
+        true=%s
+        result=%s
+        sample=%s
+        makeblastdb -in $true -dbtype nucl -out $true.db -parse_seqids
+        blastn -query $result -db $true.db -outfmt 7 -out $sample.map2true.out
+    """%(true, result_fasta, sample)
+    os.system(command)
+
+def main_minimap2():
+    minimap2_file = sample + ".map2true.paf"
+    command = """
+    minimap2 --secondary=no %s %s >%s
+    """%(true, result_fasta, minimap2_file)
+    os.system(command)
+    minimap_list_of_lengths = []
+    for line in open(minimap2_file):
+        array = line.strip().split()
+        Alignment_block_length = int(array[10])
+        minimap_list_of_lengths.append(Alignment_block_length)
+    minimap_n50 = calculate_N50(minimap_list_of_lengths)
+    return round(minimap_n50)
+     
 
 
 if __name__ == "__main__":  
     tolerate_gap = 200
     min_map_len = 200
-    blast_file = sys.argv[1]
-    true = sys.argv[2]
-    sample = sys.argv[3]
-    contig_dict = read_blast(blast_file)
-    main()
+    true = sys.argv[1]
+    sample = sys.argv[2]
+    result_fasta = sys.argv[3]
+    blast_file = sample + ".map2true.out"
+    ID = sample.split("/")[-1]
+
+    contig_dict, truth_dict = read_blast(blast_file)
+    ID, n50, precision, recall, truth_n50 = main_blast()
+    minimap_n50 = main_minimap2()
+    f = open(f"{sample}.assessment", "w")
+    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Minimap_N50: %s"%(ID, n50, precision, recall, truth_n50, minimap_n50))
+    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Minimap_N50: %s"%(ID, n50, precision, recall, truth_n50, minimap_n50), file = f)
+    f.close()
+
+    

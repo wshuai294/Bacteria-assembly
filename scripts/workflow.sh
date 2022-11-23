@@ -22,7 +22,7 @@ mkdir $outdir
 bwa_score=30 #default 30
 map_qual=20
 
-# :<<!
+:<<!
 bwa index $ref
 samtools faidx $ref
 bwa mem -T $bwa_score -M -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
@@ -101,9 +101,9 @@ mummer -maxmatch -l 1000 -b -c $true $sample.contigs.consensus.fasta >$sample.mu
 # rm $sample.rplot
 # rm $sample.contigs_q20.log
 !
-makeblastdb -in $true -dbtype nucl -out $true.db -parse_seqids
-blastn -query $sample.contigs.consensus.fasta -db $true.db -outfmt 7 -out $sample.map2true.out
-python3 $dir/measure_blast.py $sample.map2true.out $true $sample 
+# makeblastdb -in $true -dbtype nucl -out $true.db -parse_seqids
+# blastn -query $sample.contigs.consensus.fasta -db $true.db -outfmt 7 -out $sample.map2true.out
+python3 $dir/measure_blast.py $true $sample $sample.contigs.consensus.fasta
 
 end=$(date +%s)
 take=$(( end - start ))
