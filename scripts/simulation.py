@@ -20,22 +20,33 @@ class Simulation():
         self.reads_len = 150
         self.chosen_genome_num = 10
 
-        self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/ecoli/fna.list"
-        self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/ecoli_ref.fna"
+        # self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/ecoli/fna.list"
+        # self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/ecoli_ref.fna"
+        # self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/"
+        # self.res_dir = "/home/wangshuai/assembly_result/ecoli/"
 
-        # self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/Staphylococcus_lugdunensis_fna.list"
-        # self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/GCF_008728755.1/GCF_008728755.1_ASM872875v1_genomic.fna"
-        
+        self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/Staphylococcus_lugdunensis_fna.list"
+        self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/GCF_008728755.1/GCF_008728755.1_ASM872875v1_genomic.fna"
+        self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis/"
+        self.res_dir = "/home/wangshuai/assembly_result/s_lugdunensis/"
 
-        self.result_dir = "/home/wangshuai/assembly_result/ecoli/our/"
-        self.spades_dir = "/home/wangshuai/assembly_result/ecoli/spades/"
+        self.result_dir = self.res_dir + "/our/"
+        self.spades_dir = self.res_dir + "/spades/"
+        self.fastas_dir = self.sim_dir + "/fasta/"
+        self.fqdir = self.sim_dir + "/fastq/"
+        self.truth_file = self.sim_dir + "/fastq/truth_file.txt"
 
-        self.fastas_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/fasta/"
-        self.fqdir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/fastq/"
-        self.truth_file = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/fastq/truth_file.txt"
+        os.system(f"mkdir {self.sim_dir}")
+        os.system(f"mkdir {self.fastas_dir}")
+        os.system(f"mkdir {self.fqdir}")
+        os.system(f"mkdir {self.res_dir}")
+        os.system(f"mkdir {self.result_dir}")
+        os.system(f"mkdir {self.spades_dir}")
+
+       
+        self.run_script = self.sim_dir + "/run.sh"
+        self.spades_script = self.sim_dir + "/run_spades.sh"
         self.tool = "/mnt/d/breakpoints/assembly/scripts/workflow.sh"
-        self.run_script = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/run.sh"
-        self.spades_script = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/run_spades.sh"
         self.spades = "/mnt/d/breakpoints/assembly/scripts/spades.sh"
         self.ass_script = "/mnt/d/breakpoints/assembly/scripts/measure.py"
 
@@ -64,8 +75,8 @@ class Simulation():
                 if chrom_num < 3 and scaffold_ID not in scaffold_ID_dict: # make sure only one chromosome
                     # os.system(f"cp {origin_ref} {self.fastas_dir}")
                     os.system(f"head -n 1 {origin_ref} > /{self.fastas_dir}/{scaffold_ID}.fasta")
-                    # os.system(f"samtools faidx {origin_ref} {scaffold_ID}:1-1000000 |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
-                    os.system(f"samtools faidx {origin_ref} {scaffold_ID} |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
+                    os.system(f"samtools faidx {origin_ref} {scaffold_ID}:1-100000 |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
+                    # os.system(f"samtools faidx {origin_ref} {scaffold_ID} |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
                     select_num += 1
                     scaffold_ID_dict[scaffold_ID] = 1
 

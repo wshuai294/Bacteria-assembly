@@ -2,6 +2,7 @@ from Bio import SeqIO
 import sys
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+import re
 
 
 original_ref = sys.argv[1]
@@ -47,11 +48,41 @@ def main():
             merged_record.seq = Seq(str(merged_record.seq) + add_seq)
             merged_record.description += "\t" + segs_list[i]
         SeqIO.write(merged_record, output_handle, "fasta")
-        print (f"contig_{contig_index}", len(merged_record.seq))   
+        # print (f"contig_{contig_index}", len(merged_record.seq))   
         contig_index += 1
 
     output_handle.close()
     f.close()
 
+def compute_node_length():
+    f = open(graph_file, 'r')
+    h = open(graph_file + ".length", 'w')
+    contig_index = 1
+    for line in f:
+        line = line.strip()
+        if line == '':
+            continue
+        
+            print (line, file = h)
+
+        segs_list = line.strip().split()
+        accumu_len = 0
+        for i in range(len(segs_list)):
+            seg_name = segs_list[i][:-1]
+            if re.search("NODE_", seg_name):
+                length = int(seg_name.split("_")[3])
+                new_seg_name = seg_name
+            else:
+                array = seg_name.split(":")[-1].split("-")
+                length = abs(int(array[1]) - int(array[0]))
+                new_seg_name = seg_name + "_len_" + str(length)
+            accumu_len += length
+            new_seg_name = new_seg_name + "_accu_" + str(accumu_len)
+            print (new_seg_name, end = "\t", file = h)
+        print ('', end = "\n", file = h)
+    f.close()
+    h.close()
+
 
 main()
+compute_node_length()

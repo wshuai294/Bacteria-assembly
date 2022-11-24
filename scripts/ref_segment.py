@@ -135,6 +135,9 @@ class My_bkps():
             chrom = array[0]
             pos = int(array[1])
 
+            # if array[6] != "PASS":
+            #     continue
+
             if not re.search("SVTYPE=BND", line):
                 sv_len = abs(int(end_pos.group(1)) - pos)
                 if sv_len < min_sv_len:

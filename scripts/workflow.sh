@@ -21,11 +21,12 @@ mkdir $outdir
 
 bwa_score=30 #default 30
 map_qual=20
+threads=5
 
-:<<!
+# :<<!
 bwa index $ref
 samtools faidx $ref
-bwa mem -T $bwa_score -M -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
+bwa mem -T $bwa_score -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
   | samtools view -bhS -> $sample.unsort.bam
 samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
@@ -34,7 +35,7 @@ samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unma
 gzip -f $sample.unmapped.*fq 
 rm -r $outdir/ass
 echo "start spades..."
-spades.py  -t 5 -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
+spades.py  -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
 
 samtools index $sample.init.map.bam
 samtools depth $sample.init.map.bam >$sample.init.map.depth
@@ -47,15 +48,17 @@ bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
 python3 $dir/ref_segment.py $ref $origin_seg_ref $sample.delly.sv.vcf $sample.init.map.depth 1 $sample.init.map.bam
 cat $outdir/ass/contigs.fasta >>$origin_seg_ref
 
-makeblastdb -in $origin_seg_ref -dbtype nucl -out $origin_seg_ref.db -parse_seqids
-blastn -query $origin_seg_ref -db $origin_seg_ref.db -outfmt 6 -out $origin_seg_ref.blast.out
-python3 $dir/delete_repeat.py $origin_seg_ref $seg_ref $origin_seg_ref.blast.out
+cp $origin_seg_ref $seg_ref
+# delete the repeat region in the ends of the segments
+# makeblastdb -in $origin_seg_ref -dbtype nucl -out $origin_seg_ref.db -parse_seqids
+# blastn -query $origin_seg_ref -db $origin_seg_ref.db -outfmt 6 -out $origin_seg_ref.blast.out
+# python3 $dir/delete_repeat.py $origin_seg_ref $seg_ref $origin_seg_ref.blast.out
 # rm $ins_ref.*
 
 
 bwa index $seg_ref
 samtools faidx $seg_ref
-bwa mem -M -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $seg_ref $fq1 $fq2 \
+bwa mem -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $seg_ref $fq1 $fq2 \
   | samtools view -bhS -> $sample.seg.unsort.bam
 samtools sort -o $sample.seg.bam $sample.seg.unsort.bam
 samtools index $sample.seg.bam
@@ -68,14 +71,14 @@ python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
 /home/wangshuai/softwares/seqGraph/build/matching -b --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
 # $dir/../seqGraph/build/matching --model 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -i 10 -v 0 -m $sample.new.graph.txt --break_c
 echo "matching is done."
-
+!
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 rm $sample.seg.unsort.bam
 
 
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
-bwa mem -M -t 5 -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
+bwa mem -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
   | samtools view -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam

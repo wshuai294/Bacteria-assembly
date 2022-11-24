@@ -155,10 +155,24 @@ def main_minimap2():
     minimap_list_of_lengths = []
     for line in open(minimap2_file):
         array = line.strip().split()
-        Alignment_block_length = int(array[10])
+        Alignment_block_length = int(array[9])
+        if Alignment_block_length < min_map_len:
+            continue
         minimap_list_of_lengths.append(Alignment_block_length)
+    print (sorted(minimap_list_of_lengths))
     minimap_n50 = calculate_N50(minimap_list_of_lengths)
     return round(minimap_n50)
+
+def get_direct_N50(result_fasta):
+    direct_length_list = []
+    with open(result_fasta) as handle:
+        for record in SeqIO.parse(handle, "fasta"):
+            if len(record.seq) < min_map_len:
+                continue
+            direct_length_list.append(len(record.seq)) 
+    direct_N50 = calculate_N50(direct_length_list)
+    print (sorted(direct_length_list))
+    return round(direct_N50)
      
 
 
@@ -174,9 +188,10 @@ if __name__ == "__main__":
     contig_dict, truth_dict = read_blast(blast_file)
     ID, n50, precision, recall, truth_n50 = main_blast()
     minimap_n50 = main_minimap2()
+    direct_N50 = get_direct_N50(result_fasta) 
     f = open(f"{sample}.assessment", "w")
-    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Minimap_N50: %s"%(ID, n50, precision, recall, truth_n50, minimap_n50))
-    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Minimap_N50: %s"%(ID, n50, precision, recall, truth_n50, minimap_n50), file = f)
+    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Origin N50: %s, Minimap_N50: %s;"%(ID, n50, precision, recall, truth_n50, direct_N50, minimap_n50))
+    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Origin N50: %s, Minimap_N50: %s;"%(ID, n50, precision, recall, truth_n50, direct_N50, minimap_n50), file = f)
     f.close()
 
     
