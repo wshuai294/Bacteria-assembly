@@ -30,21 +30,19 @@ bwa mem -T $bwa_score -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq
   | samtools view -bhS -> $sample.unsort.bam
 samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
-python3 $dir/extract_unmap.py $sample.init.bam $sample.unmap.bam $map_qual $sample.init.map.bam
+samtools depth $sample.init.bam >$sample.init.depth
+delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
+bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
+python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt
+
+
+python3 $dir/extract_unmap.py $sample.init.bam $sample.unmap.bam $map_qual $sample.short.segs.txt
 samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unmapped.s.fq -@ 8 $sample.unmap.bam
 gzip -f $sample.unmapped.*fq 
 rm -r $outdir/ass
 echo "start spades..."
 spades.py  -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
 
-samtools index $sample.init.map.bam
-samtools depth $sample.init.map.bam >$sample.init.map.depth
-rm $sample.unsort.bam
-rm $sample.unmap.bam
-!
-delly call -g $ref -o $sample.delly.sv.bcf $sample.init.map.bam
-bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
-python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.map.depth 1 $sample.init.map.bam
 cat $outdir/ass/contigs.fasta >>$seg_ref
 
 
