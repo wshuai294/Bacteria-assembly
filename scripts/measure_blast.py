@@ -172,7 +172,7 @@ def get_direct_N50(result_fasta):
             direct_length_list.append(len(record.seq)) 
     direct_N50 = calculate_N50(direct_length_list)
     print (sorted(direct_length_list))
-    return round(direct_N50)
+    return round(direct_N50), sum(direct_length_list)
      
 
 
@@ -188,10 +188,10 @@ if __name__ == "__main__":
     contig_dict, truth_dict = read_blast(blast_file)
     ID, n50, precision, recall, truth_n50 = main_blast()
     minimap_n50 = main_minimap2()
-    direct_N50 = get_direct_N50(result_fasta) 
+    direct_N50, result_size = get_direct_N50(result_fasta) 
     f = open(f"{sample}.assessment", "w")
-    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Origin N50: %s, Minimap_N50: %s;"%(ID, n50, precision, recall, truth_n50, direct_N50, minimap_n50))
-    print ("%s\tN50: %s, Precision: %s; Recall: %s; truth_N50: %s; Origin N50: %s, Minimap_N50: %s;"%(ID, n50, precision, recall, truth_n50, direct_N50, minimap_n50), file = f)
+    print ("%s\tPrecision: %s; Recall: %s; Origin N50: %s, Minimap_N50: %s, size:%s"%(ID, precision, recall, direct_N50, minimap_n50,result_size))
+    print ("%s\tPrecision: %s; Recall: %s;Origin N50: %s, Minimap_N50: %s,size:%s;"%(ID, precision, recall, direct_N50, minimap_n50,result_size), file = f)
     f.close()
 
     

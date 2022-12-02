@@ -58,34 +58,36 @@ class Simulation():
         os.system(f"rm {self.fastas_dir}/*")
         scaffold_ID_dict = {}
 
+        origin_ref_list = []
         for line in open(self.original_genome_list):
-            num = np.random.randint(10)
-            if num < 2:
-                origin_ref = line.strip()
-                if not os.path.getsize(origin_ref):
-                    continue
-                fasta_sequences = SeqIO.parse(open(origin_ref),'fasta')       
+            origin_ref = line.strip()
+            if not os.path.getsize(origin_ref):
+                continue
+            origin_ref_list.append(origin_ref)
+        random.shuffle(origin_ref_list)
+        for origin_ref in origin_ref_list:
 
-                chrom_num = 0
-                for record in fasta_sequences:
-                    if chrom_num == 0:
-                        scaffold_ID = record.id
-                    chrom_num += 1
+            fasta_sequences = SeqIO.parse(open(origin_ref),'fasta')       
+            chrom_num = 0
+            for record in fasta_sequences:
+                if chrom_num == 0:
+                    scaffold_ID = record.id
+                chrom_num += 1
 
-                if chrom_num < 3 and scaffold_ID not in scaffold_ID_dict: # make sure only one chromosome
-                    # os.system(f"cp {origin_ref} {self.fastas_dir}")
-                    os.system(f"head -n 1 {origin_ref} > /{self.fastas_dir}/{scaffold_ID}.fasta")
-                    os.system(f"samtools faidx {origin_ref} {scaffold_ID}:1-100000 |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
-                    # os.system(f"samtools faidx {origin_ref} {scaffold_ID} |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
-                    select_num += 1
-                    scaffold_ID_dict[scaffold_ID] = 1
+            if chrom_num < 3 and scaffold_ID not in scaffold_ID_dict: # make sure only one chromosome
+                # os.system(f"cp {origin_ref} {self.fastas_dir}")
+                os.system(f"head -n 1 {origin_ref} > /{self.fastas_dir}/{scaffold_ID}.fasta")
+                # os.system(f"samtools faidx {origin_ref} {scaffold_ID}:1-100000 |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
+                os.system(f"samtools faidx {origin_ref} {scaffold_ID} |grep -v \> >> /{self.fastas_dir}/{scaffold_ID}.fasta")
+                select_num += 1
+                scaffold_ID_dict[scaffold_ID] = 1
 
             if select_num == self.chosen_genome_num:
                 break
         print ("genome selection is done.")
 
     def generate_fastq(self, ID, genome):
-        fq = f'wgsim -N 1000000 -e 0 -r 0 -R 0 -1 150 -2 150 {genome} {self.fqdir}/{ID}.1.fq {self.fqdir}/{ID}.2.fq'
+        fq = f'wgsim -N 2000000 -e 0 -r 0 -R 0 -1 150 -2 150 {genome} {self.fqdir}/{ID}.1.fq {self.fqdir}/{ID}.2.fq'
         os.system(fq)
 
     def simulate_genomes(self):
@@ -119,8 +121,8 @@ class Simulation():
             fq1 = self.fqdir + ID + ".1.fq"
             fq2 = self.fqdir + ID + ".2.fq"
             genome = array[1]
-            order = f"bash {self.tool} {self.reference} {fq1} {fq2} {ID} {self.result_dir} {genome}"
-            # order = f"/usr/bin/time -v -o {self.result_dir}/{ID}.time bash {self.tool} {self.reference} {fq1} {fq2} {ID} {self.result_dir} {genome}"
+            # order = f"bash {self.tool} {self.reference} {fq1} {fq2} {ID} {self.result_dir} {genome}"
+            order = f"/usr/bin/time -v -o {self.result_dir}/{ID}.time bash {self.tool} {self.reference} {fq1} {fq2} {ID} {self.result_dir} {genome}"
             print (order, file = f)
         f.close()
 
@@ -132,8 +134,8 @@ class Simulation():
             fq1 = self.fqdir + ID + ".1.fq"
             fq2 = self.fqdir + ID + ".2.fq"
             genome = array[1]
-            order = f"bash {self.spades} {ID} {fq1} {fq2} {self.spades_dir} {genome}"
-            # order = f"/usr/bin/time -v -o {self.spades_dir}/{ID}.time bash {self.spades} {ID} {fq1} {fq2} {self.spades_dir} {genome}"
+            # order = f"bash {self.spades} {ID} {fq1} {fq2} {self.spades_dir} {genome}"
+            order = f"/usr/bin/time -v -o {self.spades_dir}/{ID}.time bash {self.spades} {ID} {fq1} {fq2} {self.spades_dir} {genome}"
 
             print (order, file = f)
         f.close()

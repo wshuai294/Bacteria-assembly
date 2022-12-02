@@ -13,7 +13,47 @@ import time
 from get_raw_bkp import getInsertSize
 
 
+def map_ratio(read):
+    # cal the mapped ratio in a read
+    mapped_len = 0
+    read_len = 0
+    for ci in read.cigar: # record left clipped length
+        if ci[0] == 0:
+            mapped_len += int(ci[1])
+        read_len += int(ci[1])
+    return float(mapped_len)/read_len
+
+def filter_bam(bam_name):
+    """
+    make sure both the two ends satisfy the criteria
+    """
+    good_read_dict = {}
+    bamfile = pysam.AlignmentFile(filename = bam_name, mode = 'rb')
+    for read in bamfile.fetch():
+        if read.is_unmapped  or read.mate_is_unmapped:
+            continue 
+        if read.mapping_quality < min_q:
+            continue
+        if read.has_tag('XA'):
+            continue
+        if read.has_tag('SA'):
+            SA_tag = read.get_tag('SA')
+            SA_array = SA_tag.split(":")
+            if len(SA_array) > 2:
+            # print (read.get_tag('SA'), len(SA_array))
+                continue
+        # if (read.reference_name == read.next_reference_name):
+        #     continue
+        # if map_ratio(read) < min_map_ratio:
+        #     continue
+        if read.query_name  not in good_read_dict:
+            good_read_dict[read.query_name] = 0
+        good_read_dict[read.query_name] += 1
+    bamfile.close()
+    return good_read_dict
+
 def calCrossReads(bam_name):
+    # good_read_dict = filter_bam(bam_name)
     f = open(graph, "w")
     edge_dict = {}
     bamfile = pysam.AlignmentFile(filename = bam_name, mode = 'rb')
@@ -22,15 +62,26 @@ def calCrossReads(bam_name):
     insert_size = int(mean + 2*sdev) + 2 * rlen
     
     for read in bamfile.fetch():
+        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
+            print (read.is_unmapped  or read.mate_is_unmapped, read.mapping_quality, map_ratio(read), read.reference_name == read.next_reference_name)
         if read.is_unmapped  or read.mate_is_unmapped:
             continue 
         if read.mapping_quality < min_q:
             continue
         if read.has_tag('XA'):
             continue
+        if read.has_tag('SA'):
+            SA_tag = read.get_tag('SA')
+            SA_array = SA_tag.split(":")
+            if len(SA_array) > 2:
+            # print (read.get_tag('SA'), len(SA_array))
+                continue
         if (read.reference_name == read.next_reference_name):
             continue
-
+        if map_ratio(read) < min_map_ratio:
+            continue
+        # if good_read_dict[read.query_name] < 2:
+        #     continue
         if len(read.reference_name.split(':')) < 2:
             ref_len = int(read.reference_name.split('_')[3])
         else:
@@ -41,18 +92,22 @@ def calCrossReads(bam_name):
             mate_len = int(read.next_reference_name.split('_')[3])
         else:
             mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
-
+        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
+            print (read.query_name)
 
         if not (abs(read.reference_start) < insert_size or abs(ref_len - read.reference_start)< insert_size):
             continue
         if not (abs(read.next_reference_start) < insert_size or abs(mate_len - read.next_reference_start)< insert_size):
             continue
+        # test = ["NODE_3_length_1447_cov_202.137956", "NC_000913.3:4094684-4103157"]
+        # if read.reference_name in test and read.next_reference_name in test:
+        #     print (read)
 
         if read.reference_name not in chrom_copy or read.next_reference_name not in chrom_copy:
             print ("WARNING: JUNC not in SEG!!!", read.reference_name, read.next_reference_name)
             sys.exit()
         if  chrom_copy[read.reference_name] == 0 or  chrom_copy[read.next_reference_name] == 0:
-            print ("The copy of one seg is zero in the edge, thus deleted.", read.reference_name, read.next_reference_name)
+            # print ("The copy of one seg is zero in the edge, thus deleted.", read.reference_name, read.next_reference_name)
             continue
 
         if read.is_reverse:
@@ -65,26 +120,25 @@ def calCrossReads(bam_name):
             mate_ref = read.next_reference_name + " +"
 
         edge = refname + " " + mate_ref
-
+        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
+            print (read.query_name, "final", edge)
         if edge not in edge_dict:
             edge_dict[edge] = 1
         else:
             edge_dict[edge] += 1
         
     # remove_edges, my_nodes = remove_small_circle(edge_dict)   
-    remove_edges, my_nodes = {}, {}
     for chrom in chrom_copy:
         # print ("#\t", chrom, chrom_copy[chrom])
         if chrom_copy[chrom] > 0:
             print ("SEG ", chrom, round(chrom_depth[chrom]), chrom_copy[chrom], 0, 1, file = f)
         else:
-            print ("Copy of SEG %s is zero, thus deleted."%(chrom))
+            print ("Copy of SEG %s is zero, thus deleted."%(chrom), round(chrom_depth[chrom]))
     
 
     for edge in edge_dict:
-        if edge_dict[edge] < min_dp:
-            continue
-        if edge in remove_edges:
+        if edge_dict[edge] < min_edge_dp:
+            print ("removed JUNC ", edge, round(edge_dict[edge]))
             continue
         print ("JUNC ", edge, round(edge_dict[edge]), file = f)
         # print (edge, edge_dict[edge])
@@ -114,6 +168,7 @@ def cal_copy_number():
     return chrom_copy, median_depth, chrom_depth
 
 def remove_small_circle(edge_dict):
+    # discard
     my_graph = {}
     my_nodes = {}
     for edge in edge_dict:
@@ -146,13 +201,14 @@ def remove_small_circle(edge_dict):
 
 if __name__ == "__main__":
 
-    min_q = 20
-    min_dp_ratio = 0.1 #0.3
+    min_q = 20  # read quality cutoff
+    min_dp_ratio = 0.1 #0.1 #0.3
+    min_map_ratio = 0.3 # for each read
     bam_name = sys.argv[1]
     graph = sys.argv[2]
     depth_file = sys.argv[3]
     print ("start extract edges...")
     chrom_copy, median_depth, chrom_depth = cal_copy_number()
     print ("median depth:", median_depth)
-    min_dp = min_dp_ratio * median_depth
+    min_edge_dp = min_dp_ratio * median_depth
     calCrossReads(bam_name)
