@@ -42,8 +42,8 @@ gzip -f $sample.unmapped.*fq
 rm -r $outdir/ass
 echo "start spades..."
 spades.py  -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
-
-cat $outdir/ass/contigs.fasta >>$seg_ref
+python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 300
+cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
 
 
@@ -56,8 +56,10 @@ samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
+!
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
+# :<<!
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
 echo "matching is done..."
 /home/wangshuai/softwares/seqGraph/build/matching -b --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
@@ -86,7 +88,7 @@ end=$(date +%s)
 take=$(( end - start ))
 echo Time taken to map reads is ${take} seconds.  >> ${sample}.log
 
-# !
+!
 
 
 

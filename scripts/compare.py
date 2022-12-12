@@ -108,11 +108,14 @@ class Benchmark():
     
     def make_figures(self):
 
-        fig, axes = plt.subplots(2, 2, figsize=(40,10))
+        fig, axes = plt.subplots(3, 2, gridspec_kw={'width_ratios': [9, 1]}, figsize=(40,15))
         sns.barplot(ax = axes[0][0], x="ID",y='N50',hue= 'Methods',data=self.df, log=True)
+        sns.boxplot(ax = axes[0][1], x="Methods",y='N50',data=self.df, showfliers =False)
         # sns.catplot(ax = axes[0][0],x="ID",y='N50',hue= 'Methods',data=self.df, log=True)
-        sns.barplot(ax = axes[0][1], x="ID",y='CPU_Time',hue= 'Methods',data=self.df)
-        sns.barplot(ax = axes[1][0], x="ID",y='Peak_RAM',hue= 'Methods',data=self.df)
+        sns.barplot(ax = axes[1][0], x="ID",y='CPU_Time',hue= 'Methods',data=self.df)
+        sns.boxplot(ax = axes[1][1], x="Methods",y='CPU_Time',data=self.df)
+        sns.barplot(ax = axes[2][0], x="ID",y='Peak_RAM',hue= 'Methods',data=self.df)
+        sns.boxplot(ax = axes[2][1], x="Methods",y='Peak_RAM',data=self.df)
         # axes[0,1].set_ylim(0,0.05)
      
         #     plt.xticks(rotation=0)
@@ -121,8 +124,8 @@ class Benchmark():
 
 
 if __name__ == "__main__":
-    # run_script = "/mnt/d/breakpoints/assembly/sim/run.sh"
-    run_script = "/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/run.sh"
+    run_script = "/mnt/d/breakpoints/assembly/sim/run.sh"
+    # run_script = "/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/run.sh"
     ben = Benchmark(run_script)
     ben.main()
 

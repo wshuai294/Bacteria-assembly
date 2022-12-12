@@ -23,34 +23,34 @@ def map_ratio(read):
         read_len += int(ci[1])
     return float(mapped_len)/read_len
 
-def filter_bam(bam_name):
-    """
-    make sure both the two ends satisfy the criteria
-    """
-    good_read_dict = {}
-    bamfile = pysam.AlignmentFile(filename = bam_name, mode = 'rb')
-    for read in bamfile.fetch():
-        if read.is_unmapped  or read.mate_is_unmapped:
-            continue 
-        if read.mapping_quality < min_q:
-            continue
-        if read.has_tag('XA'):
-            continue
-        if read.has_tag('SA'):
-            SA_tag = read.get_tag('SA')
-            SA_array = SA_tag.split(":")
-            if len(SA_array) > 2:
-            # print (read.get_tag('SA'), len(SA_array))
-                continue
-        # if (read.reference_name == read.next_reference_name):
-        #     continue
-        # if map_ratio(read) < min_map_ratio:
-        #     continue
-        if read.query_name  not in good_read_dict:
-            good_read_dict[read.query_name] = 0
-        good_read_dict[read.query_name] += 1
-    bamfile.close()
-    return good_read_dict
+# def filter_bam(bam_name):
+#     """
+#     make sure both the two ends satisfy the criteria
+#     """
+#     good_read_dict = {}
+#     bamfile = pysam.AlignmentFile(filename = bam_name, mode = 'rb')
+#     for read in bamfile.fetch():
+#         if read.is_unmapped  or read.mate_is_unmapped:
+#             continue 
+#         if read.mapping_quality < min_q:
+#             continue
+#         if read.has_tag('XA'):
+#             continue
+#         if read.has_tag('SA'):
+#             SA_tag = read.get_tag('SA')
+#             SA_array = SA_tag.split(":")
+#             if len(SA_array) > 2:
+#             # print (read.get_tag('SA'), len(SA_array))
+#                 continue
+#         # if (read.reference_name == read.next_reference_name):
+#         #     continue
+#         # if map_ratio(read) < min_map_ratio:
+#         #     continue
+#         if read.query_name  not in good_read_dict:
+#             good_read_dict[read.query_name] = 0
+#         good_read_dict[read.query_name] += 1
+#     bamfile.close()
+#     return good_read_dict
 
 def calCrossReads(bam_name):
     # good_read_dict = filter_bam(bam_name)
@@ -60,10 +60,11 @@ def calCrossReads(bam_name):
     mean, sdev, rlen = getInsertSize(bamfile)
     rlen = int(rlen)
     insert_size = int(mean + 2*sdev) + 2 * rlen
-    
+    test_read_name = "NZ_CP020763.1_1916841_1917378_0:0:0_0:0:0_c3ac5"
+    count = 0
     for read in bamfile.fetch():
-        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
-            print (read.is_unmapped  or read.mate_is_unmapped, read.mapping_quality, map_ratio(read), read.reference_name == read.next_reference_name)
+        # if read.query_name == test_read_name:
+        #     print (read.is_unmapped  or read.mate_is_unmapped, read.mapping_quality, map_ratio(read), read.reference_name == read.next_reference_name)
         if read.is_unmapped  or read.mate_is_unmapped:
             continue 
         if read.mapping_quality < min_q:
@@ -78,10 +79,11 @@ def calCrossReads(bam_name):
                 continue
         if (read.reference_name == read.next_reference_name):
             continue
+        # test = ["NZ_CP041725.1:1726688-1858197", "NODE_5_length_9807_cov_124.160021"]
+        # if read.reference_name in test and read.next_reference_name in test:
+        #     print (read.query_name)
         if map_ratio(read) < min_map_ratio:
             continue
-        # if good_read_dict[read.query_name] < 2:
-        #     continue
         if len(read.reference_name.split(':')) < 2:
             ref_len = int(read.reference_name.split('_')[3])
         else:
@@ -92,17 +94,10 @@ def calCrossReads(bam_name):
             mate_len = int(read.next_reference_name.split('_')[3])
         else:
             mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
-        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
-            print (read.query_name)
-
         if not (abs(read.reference_start) < insert_size or abs(ref_len - read.reference_start)< insert_size):
             continue
         if not (abs(read.next_reference_start) < insert_size or abs(mate_len - read.next_reference_start)< insert_size):
             continue
-        # test = ["NODE_3_length_1447_cov_202.137956", "NC_000913.3:4094684-4103157"]
-        # if read.reference_name in test and read.next_reference_name in test:
-        #     print (read)
-
         if read.reference_name not in chrom_copy or read.next_reference_name not in chrom_copy:
             print ("WARNING: JUNC not in SEG!!!", read.reference_name, read.next_reference_name)
             sys.exit()
@@ -120,14 +115,13 @@ def calCrossReads(bam_name):
             mate_ref = read.next_reference_name + " +"
 
         edge = refname + " " + mate_ref
-        if read.query_name == "NZ_CP020763.1:1600000-2200000_378399_378977_0:0:0_0:0:0_1516":
+        if read.query_name == test_read_name:
             print (read.query_name, "final", edge)
         if edge not in edge_dict:
             edge_dict[edge] = 1
         else:
             edge_dict[edge] += 1
         
-    # remove_edges, my_nodes = remove_small_circle(edge_dict)   
     for chrom in chrom_copy:
         # print ("#\t", chrom, chrom_copy[chrom])
         if chrom_copy[chrom] > 0:
@@ -135,7 +129,6 @@ def calCrossReads(bam_name):
         else:
             print ("Copy of SEG %s is zero, thus deleted."%(chrom), round(chrom_depth[chrom]))
     
-
     for edge in edge_dict:
         if edge_dict[edge] < min_edge_dp:
             print ("removed JUNC ", edge, round(edge_dict[edge]))

@@ -18,17 +18,17 @@ class Simulation():
 
         self.depth = 50
         self.reads_len = 150
-        self.chosen_genome_num = 10
+        self.chosen_genome_num = 30
 
-        # self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/ecoli/fna.list"
-        # self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/ecoli_ref.fna"
-        # self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/"
-        # self.res_dir = "/home/wangshuai/assembly_result/ecoli/"
+        self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/ecoli/fna.list"
+        self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/ecoli_ref.fna"
+        self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/"
+        self.res_dir = "/home/wangshuai/assembly_result/ecoli/"
 
-        self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/Staphylococcus_lugdunensis_fna.list"
-        self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/GCF_008728755.1/GCF_008728755.1_ASM872875v1_genomic.fna"
-        self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis/"
-        self.res_dir = "/home/wangshuai/assembly_result/s_lugdunensis/"
+        # self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/Staphylococcus_lugdunensis_fna.list"
+        # self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/GCF_008728755.1/GCF_008728755.1_ASM872875v1_genomic.fna"
+        # self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis/"
+        # self.res_dir = "/home/wangshuai/assembly_result/s_lugdunensis/"
 
         self.result_dir = self.res_dir + "/our/"
         self.spades_dir = self.res_dir + "/spades/"
