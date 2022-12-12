@@ -24,9 +24,9 @@ map_qual=20
 threads=15
 
 # :<<!
-bwa index $ref
+bowtie2-build $ref $ref
 samtools faidx $ref
-bwa mem -T $bwa_score -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
+bowtie2 -p $threads -x $ref -1 $fq1 -2 $fq2 \
   | samtools view -bhS -> $sample.unsort.bam
 samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
@@ -47,9 +47,9 @@ cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
 
 
-bwa index $seg_ref
+bowtie2-build $seg_ref $seg_ref
 samtools faidx $seg_ref
-bwa mem -U 10000 -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $seg_ref $fq1 $fq2 \
+bowtie2 -p $threads -x $seg_ref -1 $fq1 -2 $fq2 \
   | samtools view -bhS -> $sample.seg.unsort.bam
 samtools sort -o $sample.seg.bam $sample.seg.unsort.bam
 samtools index $sample.seg.bam
@@ -66,9 +66,9 @@ echo "matching is done..."
 
 
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
-bwa index $sample.contigs.fasta
+bowtie2-build  $sample.contigs.fasta $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
-bwa mem -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
+bowtie2 -p $threads -x $sample.contigs.fasta -1 $fq1 -2 $fq2 \
   | samtools view -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
@@ -89,3 +89,4 @@ take=$(( end - start ))
 echo Time taken to map reads is ${take} seconds.  >> ${sample}.log
 
 !
+
