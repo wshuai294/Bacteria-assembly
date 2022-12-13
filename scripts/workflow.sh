@@ -19,14 +19,14 @@ dir=$(cd `dirname $0`; pwd)
 start=$(date +%s)
 mkdir $outdir
 
-bwa_score=30 #default 30
+
 map_qual=20
 threads=15
 
 # :<<!
 bwa index $ref
 samtools faidx $ref
-bwa mem -T $bwa_score -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
+bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
   | samtools view -bhS -> $sample.unsort.bam
 samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
@@ -35,28 +35,35 @@ delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
 bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
 python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt
 
+end=$(date +%s)
+take=$(( end - start ))
+echo one Time taken to map reads is ${take} seconds. # >> ${sample}.log
+
 
 python3 $dir/extract_unmap.py $sample.init.bam $sample.unmap.bam $map_qual $sample.short.segs.txt
 samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unmapped.s.fq -@ 8 $sample.unmap.bam
-gzip -f $sample.unmapped.*fq 
+gzip -f $sample.unmapped.*fq
 rm -r $outdir/ass
 echo "start spades..."
-spades.py  -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
-python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 300
+spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
+python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100
 cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
+end=$(date +%s)
+take=$(( end - start ))
+echo two Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
 
 bwa index $seg_ref
 samtools faidx $seg_ref
-bwa mem -U 10000 -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $seg_ref $fq1 $fq2 \
+bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $seg_ref $fq1 $fq2 \
   | samtools view -bhS -> $sample.seg.unsort.bam
 samtools sort -o $sample.seg.bam $sample.seg.unsort.bam
 samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
-!
+# !
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 # :<<!
@@ -64,14 +71,23 @@ python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
 echo "matching is done..."
 /home/wangshuai/softwares/seqGraph/build/matching -b --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
 
+end=$(date +%s)
+take=$(( end - start ))
+echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
+
 
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
-bwa mem -M -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
+bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
   | samtools view -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
+
+end=$(date +%s)
+take=$(( end - start ))
+echo four Time taken to map reads is ${take} seconds. # >> ${sample}.log
+
 freebayes -f $sample.contigs.fasta -p 1 $sample.contigs.bam >$sample.contigs.vcf
 vcftools --vcf $sample.contigs.vcf --minQ 20 --recode --recode-INFO-all --out $sample.contigs_q20
 bgzip -f $sample.contigs_q20.recode.vcf
@@ -86,6 +102,4 @@ python3 $dir/measure_blast.py $true $sample $sample.contigs.consensus.fasta
 
 end=$(date +%s)
 take=$(( end - start ))
-echo Time taken to map reads is ${take} seconds.  >> ${sample}.log
-
-!
+echo five Time taken to map reads is ${take} seconds. # >> ${sample}.log
