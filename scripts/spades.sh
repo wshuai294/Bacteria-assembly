@@ -15,4 +15,4 @@ mummer -mumreference -l 1000 -b -c $true $outdir/$ID/contigs.fasta >$sample.mums
 # python $dir/measure.py $sample.mums $true $sample $sample.revise.mums
 
 
-python3 $dir/measure_blast.py $true $sample $outdir/$ID/contigs.fasta
+# python3 $dir/measure_blast.py $true $sample $outdir/$ID/contigs.fasta

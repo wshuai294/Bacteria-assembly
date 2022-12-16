@@ -232,7 +232,7 @@ class My_bkps():
         intervals = self.get_bed_file()
         # order = f"samtools faidx -r {bed_file} {ref_file} > {ref_seg_file}"
         order = f"samtools faidx {ref_file} {intervals}> {ref_seg_file}"
-        print (order)
+        # print (order)
         os.system(order)
 
     def remove_unmapped_segs(self):

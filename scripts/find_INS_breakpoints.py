@@ -52,7 +52,7 @@ def ins_bps(bamname):
             save_clusters[clustering.labels_[j]].append(position_list[j])
         for i in range(cluster_num):
             central = round(np.median(save_clusters[i]))
-            print (chrom_name, central)
+            # print (chrom_name, central)
             cluster_central.append([chrom_name, central])
         # print (position_list, clustering.labels_)
     return cluster_central

@@ -87,7 +87,7 @@ class Simulation():
         print ("genome selection is done.")
 
     def generate_fastq(self, ID, genome):
-        fq = f'wgsim -N 2000000 -e 0 -r 0 -R 0 -1 150 -2 150 {genome} {self.fqdir}/{ID}.1.fq {self.fqdir}/{ID}.2.fq'
+        fq = f'wgsim -N 2000000 -e 0.01 -r 0 -R 0 -1 150 -2 150 {genome} {self.fqdir}/{ID}.1.fq {self.fqdir}/{ID}.2.fq'
         os.system(fq)
 
     def simulate_genomes(self):

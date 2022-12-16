@@ -7,6 +7,7 @@ import sys
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import re
+import os
 
 
 original_assemblies = sys.argv[1]
@@ -26,5 +27,7 @@ def main():
 
     SeqIO.write(long_sequences, novel_assemblies, "fasta")
 
-
-main()
+if os.path.isfile(original_assemblies):
+    main()
+else:
+    print ("No assembled insertions.")
