@@ -75,7 +75,7 @@ class Sample():
     
     def run_quast(self):
         self.get_result()
-        command = f" ~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir}"
+        command = f"~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir}"
         # os.system(command)
         quast = Quast(self.quast_dir)
         self.NGA50 = quast.NGA50
