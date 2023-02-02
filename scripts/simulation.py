@@ -13,7 +13,6 @@ random.seed(10)
 
 class Simulation():
 
-
     def __init__(self):
 
         self.depth = 50
@@ -49,9 +48,6 @@ class Simulation():
         self.tool = "/mnt/d/breakpoints/assembly/scripts/workflow.sh"
         self.spades = "/mnt/d/breakpoints/assembly/scripts/spades.sh"
         self.ass_script = "/mnt/d/breakpoints/assembly/scripts/measure.py"
-
-
-        
 
     def select_genomes(self):
         select_num = 0

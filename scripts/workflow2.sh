@@ -23,26 +23,13 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-# :<<!
-bwa index $ref
-samtools faidx $ref
-bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
-  | samtools view -bhS -> $sample.unsort.bam
-samtools sort -o $sample.init.bam $sample.unsort.bam
-samtools index $sample.init.bam
-samtools depth $sample.init.bam >$sample.init.depth
-delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
-bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
-python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt
+$dir/segmentation $fq1 $fq2 $ref $outdir $ID
+cat $outdir/$ID.map.fasta > $seg_ref
 
-end=$(date +%s)
-take=$(( end - start ))
-echo one Time taken to map reads is ${take} seconds. # >> ${sample}.log
-
-
-python3 $dir/extract_unmap.py $sample.init.bam $sample.unmap.bam $map_qual $sample.short.segs.txt
-samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unmapped.s.fq -@ 8 $sample.unmap.bam
+python $dir/classify_unmap_reads.py $fq1.unmap.fq  $fq2.unmap.fq $outdir $ID
 gzip -f $sample.unmapped.*fq
+
+
 rm -r $outdir/ass
 echo "start spades..."
 spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
@@ -63,12 +50,6 @@ samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
-freebayes -f $seg_ref -p 1 $sample.seg.bam >$sample.contigs.vcf
-vcftools --vcf $sample.contigs.vcf --minQ 20 --recode --recode-INFO-all --out $sample.contigs_q20
-bgzip -f $sample.contigs_q20.recode.vcf
-tabix -f $sample.contigs_q20.recode.vcf.gz
-cat $seg_ref |bcftools consensus -H 1 $sample.contigs_q20.recode.vcf.gz >$seg_ref.consensus.fasta
-
 # !
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
@@ -82,8 +63,28 @@ take=$(( end - start ))
 echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
 !
-python3 $dir/graph2contig.py $seg_ref.consensus.fasta $sample.solve.path.txt $sample.contigs.fasta
-python3 $dir/measure_blast.py $true $sample $sample.contigs.fasta
+python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
+bwa index $sample.contigs.fasta
+samtools faidx $sample.contigs.fasta
+# samtools dict -o $sample.contigs.dict $sample.contigs.fasta
+bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
+  | samtools view -bhS -> $sample.contigs.unsort.bam
+samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
+samtools index $sample.contigs.bam
+
+end=$(date +%s)
+take=$(( end - start ))
+echo four Time taken to map reads is ${take} seconds. # >> ${sample}.log
+# !
+freebayes -f $sample.contigs.fasta -p 1 $sample.contigs.bam >$sample.contigs.vcf
+# /home/wangshuai/softwares/gatk-4.3.0.0/gatk HaplotypeCaller -ploidy 1 -I $sample.contigs.bam -O $sample.contigs.vcf -R $sample.contigs.fasta 
+end=$(date +%s)
+take=$(( end - start ))
+echo five Time taken to map reads is ${take} seconds. # >> ${sample}.log
+vcftools --vcf $sample.contigs.vcf --minQ 20 --recode --recode-INFO-all --out $sample.contigs_q20
+bgzip -f $sample.contigs_q20.recode.vcf
+tabix -f $sample.contigs_q20.recode.vcf.gz
+cat $sample.contigs.fasta |bcftools consensus -H 1 $sample.contigs_q20.recode.vcf.gz >$sample.contigs.consensus.fasta
 
 end=$(date +%s)
 take=$(( end - start ))
