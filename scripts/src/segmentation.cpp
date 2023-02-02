@@ -498,11 +498,116 @@ float Select_ref::get_fitness(string fasta_file, char* coder, int* base, int k, 
 
 class Encode{
     public:
-    char *coder;
-    int *base;
-    char *comple;
-    short *choose_coder; 
+    char coder [1000];
+    char comple [256];
+    int base [32];
+    short choose_coder[100];
+    // short *choose_coder; 
+
+    
+    void generate_coder(void);
+    void generate_complement(void);
+    void generate_base(int k);
+    void random_coder(int k);
+    void constructer(int given_k);
+
 };
+
+void Encode::constructer(int given_k){
+    this->generate_coder();
+    this->generate_complement();
+    this->generate_base(given_k);
+    this->random_coder(given_k);
+    cout <<"Encoder is established."<<endl;
+}
+
+void Encode::generate_coder(void){
+    // A:65 97 T:116 84 C:99 67 G: 103 71
+    // static char coder [1000];
+    for (int j = 0; j < 1000; j++){
+        coder[j] = 5;
+    }
+    coder[65] = 1;
+    coder[97] = 1;
+
+    coder[84] = 1;
+    coder[116] = 1;
+
+    coder[67] = 0;
+    coder[99] = 0;
+
+    coder[71] = 0;
+    coder[103] = 0;
+
+    coder[65+c] = 1;
+    coder[97+c] = 1;
+
+    coder[84+c] = 0;
+    coder[116+c] = 0;
+
+    coder[67+c] = 1;
+    coder[99+c] = 1;
+
+    coder[71+c] = 0;
+    coder[103+c] = 0;
+
+    coder[65+2*c] = 1;
+    coder[97+2*c] = 1;
+
+    coder[84+2*c] = 0;
+    coder[116+2*c] = 0;
+
+    coder[67+2*c] = 0;
+    coder[99+2*c] = 0;
+
+    coder[71+2*c] = 1;
+    coder[103+2*c] = 1;
+
+    // return coder;    
+}
+
+void Encode::generate_complement(void){
+    // static char comple [256];
+    for (int j = 0; j < 256; j++){
+        comple[j] = 0;
+    }
+    comple[65] = 84;
+    comple[97] = 84;
+    comple[116] = 65;
+    comple[84] = 65;
+    comple[99] = 71;
+    comple[67] = 71;
+    comple[103] = 67;
+    comple[71] = 67;
+    // return comple;   
+}
+
+void Encode::generate_base(int k){
+    
+    for (int i = 0; i<k; i++){       
+        base[i] = pow(2, k-i-1);
+    }
+    // return base;    
+}
+
+void Encode::random_coder(int k){
+    short permu[18] = {0,1,2,0,2,1,1,2,0,1,0,2,2,0,1,2,1,0};
+    
+    int r;
+    unsigned seed;
+    seed = time(0);
+    srand(seed);
+    for (int j = 0; j < k; j++){
+        r = rand() % 6;
+        // cout << r << endl;
+        for (int i = 0; i < coder_num; i++){
+            choose_coder[j*3+i] = permu[r*3+i];
+            // cout << choose_coder[j*3+i]<<"#"<<permu[r*3+i] << endl;
+        }
+    }
+    // return choose_coder;    
+}
+
 
 void read_fastq(string fastq_file, int k, char* coder, int* base, char* comple, 
     short *choose_coder, int down_sam_ratio, long start, long end)
@@ -804,6 +909,9 @@ long * split_ref(string index_name, string fasta_file, int thread_num){
 
 int main( int argc, char *argv[])
 {
+    Encode encoder;
+    encoder.constructer(32);
+    /*
     char *coder;
     int *base;
     char *comple;
@@ -811,6 +919,7 @@ int main( int argc, char *argv[])
     coder = generate_coder(3);
     base = generate_base(k);
     comple = generate_complement();
+    choose_coder = random_coder(k);
     time_t now1 = time(0);
 
     unsigned seed;
@@ -849,7 +958,7 @@ int main( int argc, char *argv[])
     long each_size = size/thread_num;
     int down_sam_ratio = 30;
     cout <<"size\t"<<size<<endl;
-    choose_coder = random_coder(k);
+    
     
     std::vector<std::thread>threads;
 
@@ -888,7 +997,7 @@ int main( int argc, char *argv[])
     unmap.get_unmap_reads(fq2, k, coder, base, comple, choose_coder);
     unmap.output_map_segments(fasta_file, ref_seq, outdir, ID);
 
-    
+    */
     return 0;
 }
 
