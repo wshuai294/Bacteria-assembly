@@ -33,475 +33,13 @@ int thread_num;
 std::mutex mtx;  
 
 
-string get_read_ID(string reads_seq){
-    string delimiter = "/";
-    string read_name_forward = reads_seq.substr(0, reads_seq.find(delimiter));
-    delimiter = " ";
-    read_name_forward = read_name_forward.substr(0, read_name_forward.find(delimiter));
-    delimiter = "\t";
-    read_name_forward = read_name_forward.substr(0, read_name_forward.find(delimiter));
-    return read_name_forward;
-}
-
-
-class Fasta{
-    public:
-    string ref_seq;
-    string line_seq, chr_name;
-    string get_ref_seq(string fasta_file);
-    string get_ref_name(string fasta_file);
-};
-
-string Fasta::get_ref_seq(string fasta_file){
-    ifstream fa_file;
-    fa_file.open(fasta_file, ios::in);
-    // string line_seq;
-    
-    while (getline(fa_file,line_seq)){
-        if (line_seq[0] == '>'){
-            ref_seq = "\0";
-        }
-        else{
-            ref_seq += line_seq;           
-        }            
-    }
-    return ref_seq;
-}
-
-string Fasta::get_ref_name(string fasta_file){
-    ifstream fa_file;
-    fa_file.open(fasta_file, ios::in);
-    
-    while (getline(fa_file,line_seq)){
-        if (line_seq[0] == '>'){
-            chr_name = get_read_ID(line_seq).substr(1);    
-        }
-    }
-    return chr_name;
-}
-
-class Unmap{
-    public:
-        int save_map_region[1000]; // save segment intervals [start end start end ...]
-        int save_map_index = 0;
-        char *map_kmer_table = new char[array_size];
-        string ref_seq;
-        void get_unmap(char* kmer_hit_array, int ref_len);
-        void get_map_kmer(char* coder, int* base, int k, char* comple, short *choose_coder, string ref_seq);
-        void get_unmap_reads(string fastq_file, int k, char* coder, int* base, char* comple, short *choose_coder);
-        void output_map_segments(string fasta_file, string ref_seq, string outdir, string ID);
-
-};
-
-void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
-    int start = 0;
-    int end = 0;
-    int good_base_num = 0; // in a windows
-    bool good_flag = false;
-    int each_base = 0;
-    // short record_each_base[window_size];
-    queue<int>record_each_base;
-    for (int j = 0; j < ref_len; j++){
-        if (kmer_hit_array[j] >= low_depth){
-            each_base = 1;
-        }
-        else{
-            each_base = 0;
-        }
-
-        if (j < window_size){
-            record_each_base.push(each_base);
-            good_base_num += each_base;
-        }
-        else{
-            good_base_num = good_base_num - record_each_base.front() + each_base;
-            record_each_base.pop();
-            record_each_base.push(each_base);
-        }
-        end += 1;
-        // cout << j <<"\t" <<good_base_num<<endl; 
-        if (good_base_num >= window_min_hit){
-            if (good_flag == false){
-                start = end + 1 - window_size;
-                if (start < 0){
-                    start = 1;
-                }
-                good_flag = true;
-            } 
-        }
-        else{
-            if (good_flag == true){
-                // cout << start <<"\t" <<end<<endl;
-                if (save_map_index == 0){
-                    save_map_region[save_map_index*2] = start;
-                    save_map_region[save_map_index*2+1] = end; 
-                    save_map_index += 1;
-                }
-                else{
-                    if (start < save_map_region[save_map_index*2-1]){
-                        save_map_region[save_map_index*2-1] = end;
-                    }
-                    else{
-                        save_map_region[save_map_index*2] = start;
-                        save_map_region[save_map_index*2+1] = end; 
-                        save_map_index += 1;
-                    }  
-                }
-            }
-            good_flag = false;
-        }
-    }
-    if (good_flag == true){
-        if (start < save_map_region[save_map_index*2-1]){
-            save_map_region[save_map_index*2-1] = end;
-        }
-        else{
-            save_map_region[save_map_index*2] = start;
-            save_map_region[save_map_index*2+1] = end; 
-            save_map_index += 1;
-            
-        }
-    }
-
-}
-
-void Unmap::get_map_kmer(char* coder, int* base, int k, char* comple, short *choose_coder, string ref_seq){
-    unsigned int kmer_index, comple_kmer_index, real_index;
-    int m;
-    for (int z = 0; z < save_map_index; z++){
-        int start = save_map_region[z*2];
-        int end = save_map_region[z*2+1];
-        string segment = ref_seq.substr(start, end);
-        int seg_len = segment.length();
-
-        // cout <<z <<"map seg\t" <<start <<"\t" <<end<<endl;
-
-        int *ref_int = new int[seg_len];
-        int *ref_comple_int = new int[seg_len];
-        for (int j = 0; j < seg_len; j++){
-            ref_int[j] = (int)ref_seq[j];
-            ref_comple_int[j] = comple[ref_int[j]];
-        }
-
-        for (int j = 0; j < seg_len-k+1; j++){
-            int max_dp = 0;
-            for (int i = 0; i < 3; i++){
-                kmer_index = 0;
-                comple_kmer_index = 0;
-                bool all_valid = true;
-                for (int z = 0; z < k; z++){
-                    m = coder[c*choose_coder[z*3+i]+ref_int[j+z]];
-                    if (m == 5){
-                        all_valid = false;
-                        break;
-                    }
-                    kmer_index += m*base[z]; 
-                    comple_kmer_index += coder[c*choose_coder[(k-1-z)*3+i]+ref_comple_int[j+z]]*base[(k-1-z)];  
-                }
-                if (kmer_index > comple_kmer_index){ //use a smaller index
-                    real_index = comple_kmer_index;
-                }   
-                else{
-                    real_index = kmer_index;
-                }
-                if (all_valid == false){
-                    real_index = 0;
-                }
-                map_kmer_table[real_index] = 1;
-
-            } 
-
-        }
-        delete [] ref_int;
-        delete [] ref_comple_int;
-    }
-
-}
-
-void Unmap::get_unmap_reads(string fastq_file, int k, char* coder, int* base, char* comple, short *choose_coder){
-    ifstream fq_file; 
-    fq_file.open(fastq_file);
-    ofstream out_fq_file;
-    out_fq_file.open(fastq_file+".unmap.fq", ios::out);
-    string reads_seq;
-    int reads_int [300];
-    int reads_comple_int [300];
-
-    unsigned int lines = 0;
-    int converted_reads [900];
-    int complemented_reads [900];
-    int m;
-    int n;
-    unsigned int kmer_index, comple_kmer_index, real_index, b;   
-    int r ;
-    short read_len = 0;
-    string read_fq_info;
-    bool unmap_flag;
-    while (getline(fq_file, reads_seq))
-    {
-        if (lines % 4 == 1){
-            read_len = reads_seq.length();//cal read length
-            for (int j = 0; j < read_len; j++){
-                reads_int[j] = (int)reads_seq[j];
-                reads_comple_int[j] = comple[reads_int[j]];
-            }
-            int hit_kmer_num = 0;
-            for (int j = 0; j < read_len-k+1; j++){
-                bool hit_flag = false;
-                for (int i = 0; i < 3; i++){
-                    kmer_index = 0;
-                    comple_kmer_index = 0;
-                    bool all_valid = true;
-                    // cout <<j<<"\t"<<i<<"\t"<<endl;
-                    for (int z = 0; z < k; z++){
-                        m = coder[c*choose_coder[z*3+i]+reads_int[j+z]]; // choose_coder[z*3+i] indicate which coder
-                        n = coder[c*choose_coder[(k-1-z)*3+i]+reads_comple_int[j+z]];
-                        if (m == 5){
-                            all_valid = false;
-                            break;
-                        }
-                        kmer_index += m*base[z]; 
-                        comple_kmer_index += n*base[(k-1-z)];
-                            
-                    }
-                    
-                    if (kmer_index > comple_kmer_index){ //use a smaller index
-                        real_index = comple_kmer_index;
-                    }   
-                    else{
-                        real_index = kmer_index;
-                    }
-                    if (all_valid == true & map_kmer_table[real_index] > 0){
-                        hit_flag = true;
-                    }  
-                }
-                if (hit_flag){
-                    hit_kmer_num += 1;
-                }
-            } 
-            if (hit_kmer_num < 50){ // determine if a read is unmap 
-                unmap_flag = true;
-            }
-            // cout << lines << "\t" << hit_kmer_num <<endl;    
-        }
-        else{
-            if (lines % 4 == 0){
-                read_fq_info =  "\0";
-                unmap_flag = false;
-            }
-        }        
-        read_fq_info += reads_seq + '\n';
-        if (lines % 4 == 3 & unmap_flag){
-            // cout << read_fq_info << endl;
-            out_fq_file << read_fq_info; 
-        }
-        lines++;
-    }
-    fq_file.close();
-    out_fq_file.close();
-
-}
-
-void Unmap::output_map_segments(string fasta_file, string ref_seq, string outdir, string ID){
-    int start = 0;
-
-    int end = 0;
-    ofstream out_fa_file;
-    out_fa_file.open(outdir+ "/"+ ID + ".map.fasta", ios::out);
-    string map_segment_seq, map_segment_name;
-    for (int j = 0; j < save_map_index; j++){
-        start = save_map_region[j*2];
-        end = save_map_region[j*2+1];
-        // cout <<j <<"final\t" <<start <<"\t" <<end<<endl;
-        map_segment_seq = ref_seq.substr(start, end-start);
-        map_segment_name = ">chr:"+ to_string(start) + "-" + to_string(end);
-
-        out_fa_file << map_segment_name<<endl; 
-        out_fa_file << map_segment_seq<<endl;
-    }
-    out_fa_file.close();
-}
-
-char* read_ref(string ref_seq, char* coder, int* base, int k, char* comple,
-             string index_name, short *choose_coder)
-{
-    // ifstream fa_file;
-    // ofstream index_file;
-    // ofstream len_file;
-    // index_file.open(index_name, ios::out | ios::binary);
-    // len_file.open(fasta_file+".genome.len.txt", ios::out);
-    // fa_file.open(fasta_file, ios::in);
-    // string ref_seq, line_seq;
-    // ref_seq = "\0";
-    int ref_len;
-    char n;
-    int m;
-    int e;
-    unsigned int kmer_index, comple_kmer_index, real_index;
-    long extract_ref_len = 0;
-    long slide_ref_len = 0;
-    // string chr_name ;
-    time_t t0 = time(0);
-    int covert_num, comple_num;
-    short convert_ref[300];
-    short complemented_ref[300];
-
-    // save random coder
-    // for (int j = 0; j < 100; j++){
-    //     index_file.write((char *)(&choose_coder[j]), sizeof(unsigned int));
-    // }
-    cout <<"Start index ref..."<<endl;
-
-    // while (getline(fa_file,line_seq)){
-    //     if (line_seq[0] == '>'){
-    //         chr_name = get_read_ID(line_seq).substr(1);
-    //         ref_seq = "\0";
-    //     }
-    //     else{
-    //         ref_seq += line_seq;           
-    //     }            
-    // }
-    ref_len= ref_seq.length();
-    char *kmer_hit_array = new char[ref_len];
- 
-    // for (int i = 0; i < 3; i++){
-    //     kmer_index = 0; // start kmer
-    //     comple_kmer_index = 0;
-    // }
-    int *ref_int = new int[ref_len];
-    int *ref_comple_int = new int[ref_len];
-    for (int j = 0; j < ref_len; j++){
-        ref_int[j] = (int)ref_seq[j];
-        ref_comple_int[j] = comple[ref_int[j]];
-    }
-    // index_file.write((char *)(&ref_len), sizeof(unsigned int));
-    for (int j = 0; j < ref_len-k+1; j++){
-        int max_dp = 0;
-        for (int i = 0; i < 3; i++){
-            kmer_index = 0;
-            comple_kmer_index = 0;
-            bool all_valid = true;
-            for (int z = 0; z < k; z++){
-                m = coder[c*choose_coder[z*3+i]+ref_int[j+z]];
-                if (m == 5){
-                    all_valid = false;
-                    break;
-                }
-                kmer_index += m*base[z]; 
-                comple_kmer_index += coder[c*choose_coder[(k-1-z)*3+i]+ref_comple_int[j+z]]*base[(k-1-z)];  
-            }
-            if (kmer_index > comple_kmer_index){ //use a smaller index
-                real_index = comple_kmer_index;
-            }   
-            else{
-                real_index = kmer_index;
-            }
-            if (all_valid == false){
-                real_index = 0;
-            }
-            int dp = kmer_count_table[real_index];
-            if (max_dp < dp){
-                max_dp = dp;
-            }
-            // cout <<j<<"\t"<< i<<"\t"<<dp<<"\t" <<endl;
-            // index_file.write((char *)(&real_index), sizeof(real_index));  
-        }
-        kmer_hit_array[j] = max_dp; 
-    }        
-    delete [] ref_int;
-    delete [] ref_comple_int;
-    delete [] kmer_count_table;
-    time_t t1 = time(0);
-    // cout << "chr:\t" << chr_name<<"\t" <<ref_len <<" bp\t" <<t1-t0<< endl;
-
-
-    // cout << "Index is done."<< "\t" << extract_ref_len;
-
-    // fa_file.close();
-    // index_file.close();
-    // len_file.close();
-    return kmer_hit_array;
-}
-
-class Select_ref{
-    public:
-    float get_fitness(string fasta_file, char* coder, int* base, int k, char* comple, short *choose_coder);
-
-};
-
-float Select_ref::get_fitness(string fasta_file, char* coder, int* base, int k, char* comple, short *choose_coder){
-    Fasta fasta;
-    string ref_seq = fasta.get_ref_seq(fasta_file);
-    int match_base_num = 0;
-
-    int ref_len;
-    char n;
-    int m;
-    int e;
-    unsigned int kmer_index, comple_kmer_index, real_index;
-    long extract_ref_len = 0;
-    long slide_ref_len = 0;
-    time_t t0 = time(0);
-    int covert_num, comple_num;
-    short convert_ref[300];
-    short complemented_ref[300];
-
-    cout <<"check fitness..."<<endl;
-    ref_len= ref_seq.length();
- 
-
-    int *ref_int = new int[ref_len];
-    int *ref_comple_int = new int[ref_len];
-    for (int j = 0; j < ref_len; j++){
-        ref_int[j] = (int)ref_seq[j];
-        ref_comple_int[j] = comple[ref_int[j]];
-    }
-    for (int j = 0; j < ref_len-k+1; j++){
-        int max_dp = 0;
-        for (int i = 0; i < 3; i++){
-            kmer_index = 0;
-            comple_kmer_index = 0;
-            bool all_valid = true;
-            for (int z = 0; z < k; z++){
-                m = coder[c*choose_coder[z*3+i]+ref_int[j+z]];
-                if (m == 5){
-                    all_valid = false;
-                    break;
-                }
-                kmer_index += m*base[z]; 
-                comple_kmer_index += coder[c*choose_coder[(k-1-z)*3+i]+ref_comple_int[j+z]]*base[(k-1-z)];  
-            }
-            if (kmer_index > comple_kmer_index){ //use a smaller index
-                real_index = comple_kmer_index;
-            }   
-            else{
-                real_index = kmer_index;
-            }
-            if (all_valid == false){
-                real_index = 0;
-            }
-            int dp = kmer_count_table[real_index];
-            if (max_dp < dp){
-                max_dp = dp;
-            }
-        }
-        if (max_dp > low_depth){
-            match_base_num += 1;
-        }
-    }        
-    delete [] ref_int;
-    delete [] ref_comple_int;
-    float match_rate = match_base_num/ref_len;
-    return match_rate;
-
-}
-
 class Encode{
     public:
     char coder [1000];
     char comple [256];
     int base [32];
     short choose_coder[100];
+    int k;
     // short *choose_coder; 
 
     
@@ -514,6 +52,7 @@ class Encode{
 };
 
 void Encode::constructer(int given_k){
+    k = given_k;
     this->generate_coder();
     this->generate_complement();
     this->generate_base(given_k);
@@ -609,8 +148,473 @@ void Encode::random_coder(int k){
 }
 
 
-void read_fastq(string fastq_file, int k, char* coder, int* base, char* comple, 
-    short *choose_coder, int down_sam_ratio, long start, long end)
+string get_read_ID(string reads_seq){
+    string delimiter = "/";
+    string read_name_forward = reads_seq.substr(0, reads_seq.find(delimiter));
+    delimiter = " ";
+    read_name_forward = read_name_forward.substr(0, read_name_forward.find(delimiter));
+    delimiter = "\t";
+    read_name_forward = read_name_forward.substr(0, read_name_forward.find(delimiter));
+    return read_name_forward;
+}
+
+
+class Fasta{
+    public:
+    string ref_seq;
+    string line_seq, chr_name;
+    string get_ref_seq(string fasta_file);
+    string get_ref_name(string fasta_file);
+};
+
+string Fasta::get_ref_seq(string fasta_file){
+    ifstream fa_file;
+    fa_file.open(fasta_file, ios::in);
+    // string line_seq;
+    
+    while (getline(fa_file,line_seq)){
+        if (line_seq[0] == '>'){
+            ref_seq = "\0";
+        }
+        else{
+            ref_seq += line_seq;           
+        }            
+    }
+    return ref_seq;
+}
+
+string Fasta::get_ref_name(string fasta_file){
+    ifstream fa_file;
+    fa_file.open(fasta_file, ios::in);
+    
+    while (getline(fa_file,line_seq)){
+        if (line_seq[0] == '>'){
+            chr_name = get_read_ID(line_seq).substr(1);    
+        }
+    }
+    return chr_name;
+}
+
+class Unmap{
+    public:
+        int save_map_region[1000]; // save segment intervals [start end start end ...]
+        int save_map_index = 0;
+        char *map_kmer_table = new char[array_size];
+        string ref_seq;
+        void get_unmap(char* kmer_hit_array, int ref_len);
+        void get_map_kmer(Encode encoder, string ref_seq);
+        void get_unmap_reads(string fastq_file, Encode encoder);
+        void output_map_segments(string fasta_file, string ref_seq, string outdir, string ID);
+
+};
+
+void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
+    int start = 0;
+    int end = 0;
+    int good_base_num = 0; // in a windows
+    bool good_flag = false;
+    int each_base = 0;
+    // short record_each_base[window_size];
+    queue<int>record_each_base;
+    for (int j = 0; j < ref_len; j++){
+        if (kmer_hit_array[j] >= low_depth){
+            each_base = 1;
+        }
+        else{
+            each_base = 0;
+        }
+
+        if (j < window_size){
+            record_each_base.push(each_base);
+            good_base_num += each_base;
+        }
+        else{
+            good_base_num = good_base_num - record_each_base.front() + each_base;
+            record_each_base.pop();
+            record_each_base.push(each_base);
+        }
+        end += 1;
+        // cout << j <<"\t" <<good_base_num<<endl; 
+        if (good_base_num >= window_min_hit){
+            if (good_flag == false){
+                start = end + 1 - window_size;
+                if (start < 0){
+                    start = 1;
+                }
+                good_flag = true;
+            } 
+        }
+        else{
+            if (good_flag == true){
+                // cout << start <<"\t" <<end<<endl;
+                if (save_map_index == 0){
+                    save_map_region[save_map_index*2] = start;
+                    save_map_region[save_map_index*2+1] = end; 
+                    save_map_index += 1;
+                }
+                else{
+                    if (start < save_map_region[save_map_index*2-1]){
+                        save_map_region[save_map_index*2-1] = end;
+                    }
+                    else{
+                        save_map_region[save_map_index*2] = start;
+                        save_map_region[save_map_index*2+1] = end; 
+                        save_map_index += 1;
+                    }  
+                }
+            }
+            good_flag = false;
+        }
+    }
+    if (good_flag == true){
+        if (start < save_map_region[save_map_index*2-1]){
+            save_map_region[save_map_index*2-1] = end;
+        }
+        else{
+            save_map_region[save_map_index*2] = start;
+            save_map_region[save_map_index*2+1] = end; 
+            save_map_index += 1;
+            
+        }
+    }
+
+}
+
+void Unmap::get_map_kmer(Encode encoder, string ref_seq){
+    unsigned int kmer_index, comple_kmer_index, real_index;
+    int m;
+    for (int z = 0; z < save_map_index; z++){
+        int start = save_map_region[z*2];
+        int end = save_map_region[z*2+1];
+        string segment = ref_seq.substr(start, end);
+        int seg_len = segment.length();
+
+        // cout <<z <<"map seg\t" <<start <<"\t" <<end<<endl;
+
+        int *ref_int = new int[seg_len];
+        int *ref_comple_int = new int[seg_len];
+        for (int j = 0; j < seg_len; j++){
+            ref_int[j] = (int)ref_seq[j];
+            ref_comple_int[j] = encoder.comple[ref_int[j]];
+        }
+
+        for (int j = 0; j < seg_len-k+1; j++){
+            int max_dp = 0;
+            for (int i = 0; i < 3; i++){
+                kmer_index = 0;
+                comple_kmer_index = 0;
+                bool all_valid = true;
+                for (int z = 0; z < encoder.k; z++){
+                    m = encoder.coder[c*encoder.choose_coder[z*3+i]+ref_int[j+z]];
+                    if (m == 5){
+                        all_valid = false;
+                        break;
+                    }
+                    kmer_index += m*encoder.base[z]; 
+                    comple_kmer_index += encoder.coder[c*encoder.choose_coder[(k-1-z)*3+i]+ref_comple_int[j+z]]*encoder.base[(k-1-z)];  
+                }
+                if (kmer_index > comple_kmer_index){ //use a smaller index
+                    real_index = comple_kmer_index;
+                }   
+                else{
+                    real_index = kmer_index;
+                }
+                if (all_valid == false){
+                    real_index = 0;
+                }
+                map_kmer_table[real_index] = 1;
+
+            } 
+
+        }
+        delete [] ref_int;
+        delete [] ref_comple_int;
+    }
+
+}
+
+void Unmap::get_unmap_reads(string fastq_file, Encode encoder){
+    ifstream fq_file; 
+    fq_file.open(fastq_file);
+    ofstream out_fq_file;
+    out_fq_file.open(fastq_file+".unmap.fq", ios::out);
+    string reads_seq;
+    int reads_int [300];
+    int reads_comple_int [300];
+
+    unsigned int lines = 0;
+    int converted_reads [900];
+    int complemented_reads [900];
+    int m;
+    int n;
+    unsigned int kmer_index, comple_kmer_index, real_index, b;   
+    int r ;
+    short read_len = 0;
+    string read_fq_info;
+    bool unmap_flag;
+    while (getline(fq_file, reads_seq))
+    {
+        if (lines % 4 == 1){
+            read_len = reads_seq.length();//cal read length
+            for (int j = 0; j < read_len; j++){
+                reads_int[j] = (int)reads_seq[j];
+                reads_comple_int[j] = encoder.comple[reads_int[j]];
+            }
+            int hit_kmer_num = 0;
+            for (int j = 0; j < read_len-encoder.k+1; j++){
+                bool hit_flag = false;
+                for (int i = 0; i < 3; i++){
+                    kmer_index = 0;
+                    comple_kmer_index = 0;
+                    bool all_valid = true;
+                    // cout <<j<<"\t"<<i<<"\t"<<endl;
+                    for (int z = 0; z < encoder.k; z++){
+                        m = encoder.coder[c*encoder.choose_coder[z*3+i]+reads_int[j+z]]; // choose_coder[z*3+i] indicate which coder
+                        n = encoder.coder[c*encoder.choose_coder[(encoder.k-1-z)*3+i]+reads_comple_int[j+z]];
+                        if (m == 5){
+                            all_valid = false;
+                            break;
+                        }
+                        kmer_index += m*encoder.base[z]; 
+                        comple_kmer_index += n*encoder.base[(encoder.k-1-z)];
+                            
+                    }
+                    
+                    if (kmer_index > comple_kmer_index){ //use a smaller index
+                        real_index = comple_kmer_index;
+                    }   
+                    else{
+                        real_index = kmer_index;
+                    }
+                    if (all_valid == true & map_kmer_table[real_index] > 0){
+                        hit_flag = true;
+                    }  
+                }
+                if (hit_flag){
+                    hit_kmer_num += 1;
+                }
+            } 
+            if (hit_kmer_num < 50){ // determine if a read is unmap 
+                unmap_flag = true;
+            }
+            // cout << lines << "\t" << hit_kmer_num <<endl;    
+        }
+        else{
+            if (lines % 4 == 0){
+                read_fq_info =  "\0";
+                unmap_flag = false;
+            }
+        }        
+        read_fq_info += reads_seq + '\n';
+        if (lines % 4 == 3 & unmap_flag){
+            // cout << read_fq_info << endl;
+            out_fq_file << read_fq_info; 
+        }
+        lines++;
+    }
+    fq_file.close();
+    out_fq_file.close();
+
+}
+
+void Unmap::output_map_segments(string fasta_file, string ref_seq, string outdir, string ID){
+    int start = 0;
+
+    int end = 0;
+    ofstream out_fa_file;
+    out_fa_file.open(outdir+ "/"+ ID + ".map.fasta", ios::out);
+    string map_segment_seq, map_segment_name;
+    for (int j = 0; j < save_map_index; j++){
+        start = save_map_region[j*2];
+        end = save_map_region[j*2+1];
+        // cout <<j <<"final\t" <<start <<"\t" <<end<<endl;
+        map_segment_seq = ref_seq.substr(start, end-start);
+        map_segment_name = ">chr:"+ to_string(start) + "-" + to_string(end);
+
+        out_fa_file << map_segment_name<<endl; 
+        out_fa_file << map_segment_seq<<endl;
+    }
+    out_fa_file.close();
+}
+
+char* read_ref(string ref_seq, Encode encoder, string index_name)
+{
+    // ifstream fa_file;
+    // ofstream index_file;
+    // ofstream len_file;
+    // index_file.open(index_name, ios::out | ios::binary);
+    // len_file.open(fasta_file+".genome.len.txt", ios::out);
+    // fa_file.open(fasta_file, ios::in);
+    // string ref_seq, line_seq;
+    // ref_seq = "\0";
+    int ref_len;
+    char n;
+    int m;
+    int e;
+    unsigned int kmer_index, comple_kmer_index, real_index;
+    long extract_ref_len = 0;
+    long slide_ref_len = 0;
+    // string chr_name ;
+    time_t t0 = time(0);
+    int covert_num, comple_num;
+    short convert_ref[300];
+    short complemented_ref[300];
+
+    // save random coder
+    // for (int j = 0; j < 100; j++){
+    //     index_file.write((char *)(&choose_coder[j]), sizeof(unsigned int));
+    // }
+    cout <<"Start index ref..."<<endl;
+
+    // while (getline(fa_file,line_seq)){
+    //     if (line_seq[0] == '>'){
+    //         chr_name = get_read_ID(line_seq).substr(1);
+    //         ref_seq = "\0";
+    //     }
+    //     else{
+    //         ref_seq += line_seq;           
+    //     }            
+    // }
+    ref_len= ref_seq.length();
+    char *kmer_hit_array = new char[ref_len];
+ 
+    // for (int i = 0; i < 3; i++){
+    //     kmer_index = 0; // start kmer
+    //     comple_kmer_index = 0;
+    // }
+    int *ref_int = new int[ref_len];
+    int *ref_comple_int = new int[ref_len];
+    for (int j = 0; j < ref_len; j++){
+        ref_int[j] = (int)ref_seq[j];
+        ref_comple_int[j] = encoder.comple[ref_int[j]];
+    }
+    // index_file.write((char *)(&ref_len), sizeof(unsigned int));
+    for (int j = 0; j < ref_len-encoder.k+1; j++){
+        int max_dp = 0;
+        for (int i = 0; i < 3; i++){
+            kmer_index = 0;
+            comple_kmer_index = 0;
+            bool all_valid = true;
+            for (int z = 0; z < encoder.k; z++){
+                m = encoder.coder[c*encoder.choose_coder[z*3+i]+ref_int[j+z]];
+                if (m == 5){
+                    all_valid = false;
+                    break;
+                }
+                kmer_index += m*encoder.base[z]; 
+                comple_kmer_index += encoder.coder[c*encoder.choose_coder[(encoder.k-1-z)*3+i]+ref_comple_int[j+z]]*encoder.base[(encoder.k-1-z)];  
+            }
+            if (kmer_index > comple_kmer_index){ //use a smaller index
+                real_index = comple_kmer_index;
+            }   
+            else{
+                real_index = kmer_index;
+            }
+            if (all_valid == false){
+                real_index = 0;
+            }
+            int dp = kmer_count_table[real_index];
+            if (max_dp < dp){
+                max_dp = dp;
+            }
+            // cout <<j<<"\t"<< i<<"\t"<<dp<<"\t" <<endl;
+            // index_file.write((char *)(&real_index), sizeof(real_index));  
+        }
+        kmer_hit_array[j] = max_dp; 
+    }        
+    delete [] ref_int;
+    delete [] ref_comple_int;
+    delete [] kmer_count_table;
+    time_t t1 = time(0);
+    // cout << "chr:\t" << chr_name<<"\t" <<ref_len <<" bp\t" <<t1-t0<< endl;
+
+
+    // cout << "Index is done."<< "\t" << extract_ref_len;
+
+    // fa_file.close();
+    // index_file.close();
+    // len_file.close();
+    return kmer_hit_array;
+}
+
+class Select_ref{
+    public:
+    float get_fitness(string fasta_file, char* coder, int* base, int k, char* comple, short *choose_coder);
+
+};
+
+float Select_ref::get_fitness(string fasta_file, Encode encoder){
+    Fasta fasta;
+    string ref_seq = fasta.get_ref_seq(fasta_file);
+    int match_base_num = 0;
+
+    int ref_len;
+    char n;
+    int m;
+    int e;
+    unsigned int kmer_index, comple_kmer_index, real_index;
+    long extract_ref_len = 0;
+    long slide_ref_len = 0;
+    time_t t0 = time(0);
+    int covert_num, comple_num;
+    short convert_ref[300];
+    short complemented_ref[300];
+
+    cout <<"check fitness..."<<endl;
+    ref_len= ref_seq.length();
+ 
+
+    int *ref_int = new int[ref_len];
+    int *ref_comple_int = new int[ref_len];
+    for (int j = 0; j < ref_len; j++){
+        ref_int[j] = (int)ref_seq[j];
+        ref_comple_int[j] = encoder.comple[ref_int[j]];
+    }
+    for (int j = 0; j < ref_len-encoder.k+1; j++){
+        int max_dp = 0;
+        for (int i = 0; i < 3; i++){
+            kmer_index = 0;
+            comple_kmer_index = 0;
+            bool all_valid = true;
+            for (int z = 0; z < encoder.k; z++){
+                m = encoder.coder[c*encoder.choose_coder[z*3+i]+ref_int[j+z]];
+                if (m == 5){
+                    all_valid = false;
+                    break;
+                }
+                kmer_index += m*encoder.base[z]; 
+                comple_kmer_index += encoder.coder[c*encoder.choose_coder[(encoder.k-1-z)*3+i]+ref_comple_int[j+z]]*encoder.base[(k-1-z)];  
+            }
+            if (kmer_index > comple_kmer_index){ //use a smaller index
+                real_index = comple_kmer_index;
+            }   
+            else{
+                real_index = kmer_index;
+            }
+            if (all_valid == false){
+                real_index = 0;
+            }
+            int dp = kmer_count_table[real_index];
+            if (max_dp < dp){
+                max_dp = dp;
+            }
+        }
+        if (max_dp > low_depth){
+            match_base_num += 1;
+        }
+    }        
+    delete [] ref_int;
+    delete [] ref_comple_int;
+
+    float match_rate = match_base_num/ref_len;
+
+    return match_rate;
+}
+
+
+
+
+void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long start, long end)
 {
     time_t t0 = time(0);
     ifstream fq_file; 
@@ -661,10 +665,10 @@ void read_fastq(string fastq_file, int k, char* coder, int* base, char* comple,
             if (r < down_sam_ratio){
                 for (int j = 0; j < read_len; j++){
                     reads_int[j] = (int)reads_seq[j];
-                    reads_comple_int[j] = comple[reads_int[j]];
+                    reads_comple_int[j] = encoder.comple[reads_int[j]];
                 }
                 
-                for (int j = 0; j < read_len-k+1; j++){
+                for (int j = 0; j < read_len-encoder.k+1; j++){
                     
                     for (int i = 0; i < 3; i++){
                         // cout <<j<<"hi"<<i<<endl;
@@ -673,16 +677,16 @@ void read_fastq(string fastq_file, int k, char* coder, int* base, char* comple,
                         
                         bool all_valid = true;
                         // cout <<j<<"\t"<<i<<"\t"<<endl;
-                        for (int z = 0; z<k; z++){
-                            m = coder[c*choose_coder[z*3+i]+reads_int[j+z]]; // choose_coder[z*3+i] indicate which coder
-                            n = coder[c*choose_coder[(k-1-z)*3+i]+reads_comple_int[j+z]];
+                        for (int z = 0; z<encoder.k; z++){
+                            m = encoder.coder[c*encoder.choose_coder[z*3+i]+reads_int[j+z]]; // choose_coder[z*3+i] indicate which coder
+                            n = encoder.coder[c*encoder.choose_coder[(k-1-z)*3+i]+reads_comple_int[j+z]];
                             if (m == 5){
                                 all_valid = false;
                                 // cout << "N !" << endl;
                                 break;
                             }
-                            kmer_index += m*base[z]; 
-                            comple_kmer_index += n*base[(k-1-z)];
+                            kmer_index += m*encoder.base[z]; 
+                            comple_kmer_index += n*encoder.base[(encoder.k-1-z)];
                               
                         }
                         
@@ -909,23 +913,26 @@ long * split_ref(string index_name, string fasta_file, int thread_num){
 
 int main( int argc, char *argv[])
 {
-    Encode encoder;
-    encoder.constructer(32);
-    /*
-    char *coder;
-    int *base;
-    char *comple;
-    short *choose_coder;
-    coder = generate_coder(3);
-    base = generate_base(k);
-    comple = generate_complement();
-    choose_coder = random_coder(k);
-    time_t now1 = time(0);
-
     unsigned seed;
     // seed = time(0);
     seed = 1;
     srand(seed);
+
+
+    Encode encoder;
+    encoder.constructer(k);
+
+    // char *coder;
+    // int *base;
+    // char *comple;
+    // short *choose_coder;
+    // coder = generate_coder(3);
+    // base = generate_base(k);
+    // comple = generate_complement();
+    // choose_coder = random_coder(k);
+    time_t now1 = time(0);
+
+
 
     thread_num = 10; 
     
@@ -968,7 +975,7 @@ int main( int argc, char *argv[])
         if (i == thread_num-1){
             end = size;
         }
-        threads.push_back(thread(read_fastq, fq1, k, coder, base, comple, choose_coder, down_sam_ratio, start, end));
+        threads.push_back(thread(read_fastq, fq1, encoder, down_sam_ratio, start, end));
     }
 	for (auto&th : threads)
 		th.join();
@@ -980,7 +987,7 @@ int main( int argc, char *argv[])
         if (i == thread_num-1){
             end = size;
         }
-        threads.push_back(thread(read_fastq, fq2, k, coder, base, comple, choose_coder, down_sam_ratio, start, end));
+        threads.push_back(thread(read_fastq, fq2, encoder, down_sam_ratio, start, end));
     }
 	for (auto&th : threads)
 		th.join();
@@ -989,15 +996,15 @@ int main( int argc, char *argv[])
     Fasta fasta;
     string ref_seq = fasta.get_ref_seq(fasta_file);
     int ref_len = ref_seq.length();
-    char* kmer_hit_array = read_ref(ref_seq, coder, base, k, comple, index_name, choose_coder);
+    char* kmer_hit_array = read_ref(ref_seq, encoder, index_name);
     Unmap unmap;
     unmap.get_unmap(kmer_hit_array, ref_len);
-    unmap.get_map_kmer(coder, base, k, comple, choose_coder, ref_seq);
-    unmap.get_unmap_reads(fq1, k, coder, base, comple, choose_coder);
-    unmap.get_unmap_reads(fq2, k, coder, base, comple, choose_coder);
+    unmap.get_map_kmer(encoder, ref_seq);
+    unmap.get_unmap_reads(fq1, encoder);
+    unmap.get_unmap_reads(fq2, encoder);
     unmap.output_map_segments(fasta_file, ref_seq, outdir, ID);
 
-    */
+    // */
     return 0;
 }
 
