@@ -383,8 +383,7 @@ void Unmap::get_unmap_reads(string fastq_file, Encode encoder){
                             break;
                         }
                         kmer_index += m*encoder.base[z]; 
-                        comple_kmer_index += n*encoder.base[(encoder.k-1-z)];
-                            
+                        comple_kmer_index += n*encoder.base[(encoder.k-1-z)];       
                     }
                     
                     if (kmer_index > comple_kmer_index){ //use a smaller index
@@ -952,7 +951,6 @@ int main( int argc, char *argv[])
     srand(seed);
     time_t now1 = time(0);
 
-
     string fq1 = argv[1];
     string fq2 = argv[2];  
     string fasta_list = argv[3]; // a fasta file list, where each fasta is a single chromosome
@@ -962,6 +960,18 @@ int main( int argc, char *argv[])
     string match_rate_file = argv[7]; // output file, the match rate of each fasta
     array_size = pow(2, k);
     kmer_count_table = new char[array_size];
+    int down_sam_ratio = stod(argv[8]); // percentage (0-100), randomly select reads with this probability, 30
+
+    // string fq1 = argv[1];
+    // string fq2 = argv[2];  
+    // string fasta_file = argv[3];
+    // string outdir = argv[4];
+    // string ID = argv[5];
+    // thread_num = 1; 
+    // k = 26;
+    // low_depth = 10;
+    // array_size = pow(2, k);
+    // kmer_count_table = new char[array_size];
     
 
     Encode encoder;
@@ -969,12 +979,7 @@ int main( int argc, char *argv[])
 
     
 
-    // thread_num = 10; 
-    // string fq1 = argv[1];
-    // string fq2 = argv[2];  
-    // string fasta_file = argv[3];
-    // string outdir = argv[4];
-    // string ID = argv[5];
+
     
     // string fq1 = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis//fastq/FDAARGOS_222.1.fq";
     // string fq2 = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis//fastq/FDAARGOS_222.2.fq";
@@ -982,22 +987,12 @@ int main( int argc, char *argv[])
 
     string index_name = "no use"; //fasta_file + ".k" + to_string(k) + ".index.dat";
     
-    // string fasta_file = argv[3];
-    // string interval_name = argv[4];
-    // string accept_hit_ratio = argv[5];
-    // string accept_perfect_hit_ratio = argv[6];
-    // string accept_thread_num = argv[7];
-    // float hit_ratio = stod(accept_hit_ratio);
-    // float perfect_hit_ratio = stod(accept_perfect_hit_ratio);
-    // long down_sampling_size = 2000000000; //2G bases
-    // thread_num = stod(accept_thread_num);
-
     
     long start = 0;
     long end = 0;
     long size = file_size(fq1);
     long each_size = size/thread_num;
-    int down_sam_ratio = 30;
+    
     cout <<"size\t"<<size<<endl;
     
     
@@ -1028,23 +1023,26 @@ int main( int argc, char *argv[])
     threads.clear();
     time_t now2 = time(0);
     cout << "reads are loaded. "<< now2 - now1<<endl;
-    /*
-    Fasta fasta;
-    string ref_seq = fasta.get_ref_seq(fasta_file);
-    int ref_len = ref_seq.length();
-    char* kmer_hit_array = read_ref(ref_seq, encoder, index_name);
-    Unmap unmap;
-    unmap.get_unmap(kmer_hit_array, ref_len);
-    unmap.get_map_kmer(encoder, ref_seq);
-    unmap.get_unmap_reads(fq1, encoder);
-    unmap.get_unmap_reads(fq2, encoder);
-    unmap.output_map_segments(fasta_file, ref_seq, outdir, ID);
 
-    */
+
+
     Select_ref select;
     string select_genome = select.check_each_genome(fasta_list, encoder, match_rate_file); //"/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/fasta/s_lugdunensis.database"
 
     return 0;
 }
 
-
+// Fasta fasta;
+// string ref_seq = fasta.get_ref_seq(fasta_file);
+// int ref_len = ref_seq.length();
+// char* kmer_hit_array = read_ref(ref_seq, encoder, index_name);
+// Unmap unmap;
+// unmap.get_unmap(kmer_hit_array, ref_len);
+// unmap.get_map_kmer(encoder, ref_seq);
+// unmap.get_unmap_reads(fq1, encoder);
+// time_t now3 = time(0);
+// cout << "read ref done. "<< now3 - now2 << endl;
+// unmap.get_unmap_reads(fq2, encoder);
+// unmap.output_map_segments(fasta_file, ref_seq, outdir, ID);
+// time_t now4 = time(0);
+// cout << "Get unmap reads. "<< now4 - now3 << endl;

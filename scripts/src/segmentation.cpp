@@ -15,6 +15,7 @@
 #include <map>
 #include <mutex>
 #include <queue>
+#include <list>
 
 
 using namespace std;
@@ -22,13 +23,14 @@ using namespace std;
 const short c = 300;
 const char coder_num = 3;
 const unsigned char least_depth = 127;
-const unsigned int window_size = 500;
-const unsigned int window_min_hit = 450;
+const unsigned int window_size = 10000;
+const unsigned int window_min_hit = 9500;
 
 unsigned char low_depth;
 int k;
 char *kmer_count_table;
 long array_size;
+// vector<string> record_read_mapping_list;
 
 // const unsigned char low_depth = 10;
 // const int k = 26;
@@ -280,11 +282,10 @@ void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
         else{
             save_map_region[save_map_index*2] = start;
             save_map_region[save_map_index*2+1] = end; 
-            save_map_index += 1;
-            
+            save_map_index += 1;  
         }
     }
-
+    delete []kmer_hit_array;
 }
 
 void Unmap::get_map_kmer(Encode encoder, string ref_seq){
@@ -304,7 +305,6 @@ void Unmap::get_map_kmer(Encode encoder, string ref_seq){
             ref_int[j] = (int)ref_seq[j];
             ref_comple_int[j] = encoder.comple[ref_int[j]];
         }
-
         for (int j = 0; j < seg_len-k+1; j++){
             int max_dp = 0;
             for (int i = 0; i < 3; i++){
@@ -330,14 +330,11 @@ void Unmap::get_map_kmer(Encode encoder, string ref_seq){
                     real_index = 0;
                 }
                 map_kmer_table[real_index] = 1;
-
             } 
-
         }
         delete [] ref_int;
         delete [] ref_comple_int;
     }
-
 }
 
 void Unmap::get_unmap_reads(string fastq_file, Encode encoder){
@@ -443,16 +440,8 @@ void Unmap::output_map_segments(string fasta_file, string ref_seq, string outdir
     out_fa_file.close();
 }
 
-char* read_ref(string ref_seq, Encode encoder, string index_name)
+char* read_ref(string ref_seq, Encode encoder)
 {
-    // ifstream fa_file;
-    // ofstream index_file;
-    // ofstream len_file;
-    // index_file.open(index_name, ios::out | ios::binary);
-    // len_file.open(fasta_file+".genome.len.txt", ios::out);
-    // fa_file.open(fasta_file, ios::in);
-    // string ref_seq, line_seq;
-    // ref_seq = "\0";
     int ref_len;
     char n;
     int m;
@@ -466,28 +455,11 @@ char* read_ref(string ref_seq, Encode encoder, string index_name)
     short convert_ref[300];
     short complemented_ref[300];
 
-    // save random coder
-    // for (int j = 0; j < 100; j++){
-    //     index_file.write((char *)(&choose_coder[j]), sizeof(unsigned int));
-    // }
     cout <<"Start index ref..."<<endl;
 
-    // while (getline(fa_file,line_seq)){
-    //     if (line_seq[0] == '>'){
-    //         chr_name = get_read_ID(line_seq).substr(1);
-    //         ref_seq = "\0";
-    //     }
-    //     else{
-    //         ref_seq += line_seq;           
-    //     }            
-    // }
     ref_len= ref_seq.length();
     char *kmer_hit_array = new char[ref_len];
- 
-    // for (int i = 0; i < 3; i++){
-    //     kmer_index = 0; // start kmer
-    //     comple_kmer_index = 0;
-    // }
+
     int *ref_int = new int[ref_len];
     int *ref_comple_int = new int[ref_len];
     for (int j = 0; j < ref_len; j++){
@@ -532,14 +504,6 @@ char* read_ref(string ref_seq, Encode encoder, string index_name)
     delete [] ref_comple_int;
     delete [] kmer_count_table;
     time_t t1 = time(0);
-    // cout << "chr:\t" << chr_name<<"\t" <<ref_len <<" bp\t" <<t1-t0<< endl;
-
-
-    // cout << "Index is done."<< "\t" << extract_ref_len;
-
-    // fa_file.close();
-    // index_file.close();
-    // len_file.close();
     return kmer_hit_array;
 }
 
@@ -547,7 +511,6 @@ class Select_ref{
     public:
     float get_fitness(string fasta_file, Encode encoder);
     string check_each_genome(string genome_list_file, Encode encoder, string match_rate_file);
-
 };
 
 float Select_ref::get_fitness(string fasta_file, Encode encoder){
@@ -740,122 +703,112 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long star
     }
     fq_file.close();
     // return kmer_count_table;
-
 }
 
-char * generate_coder(bool coder_num)
+void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long start, long end, char *map_kmer_table)
 {
-    // A:65 97 T:116 84 C:99 67 G: 103 71
-    static char coder [1000];
-    for (int j = 0; j < 1000; j++){
-        coder[j] = 5;
+    time_t t0 = time(0);
+    ifstream fq_file; 
+    fq_file.open(fastq_file);
+
+    ofstream unmap_fq_file;
+    unmap_fq_file.open(fastq_file+ "_part_" + to_string(start)+".txt", ios::out);
+
+    long pos = 0;
+    for (long i = start; i>0; i--){
+        fq_file.seekg(i, ios::beg);
+        char j;
+        fq_file.get(j);
+        if (j == '@'){ //only read name has this symbol.
+            pos = i;
+            break;
+        }       
     }
-    coder[65] = 1;
-    coder[97] = 1;
+    fq_file.seekg(pos, ios::beg);
+    long add_size = start;
 
-    coder[84] = 1;
-    coder[116] = 1;
+    string reads_seq;
+    int reads_int [300];
+    int reads_comple_int [300];
 
-    coder[67] = 0;
-    coder[99] = 0;
+    unsigned int lines = 0;
+    int converted_reads [900];
+    int complemented_reads [900];
+    int m,n,r;
+    unsigned int kmer_index, comple_kmer_index, real_index, b;   
+    short read_len = 0;
+    bool all_valid;
+    int read_index = 0;
+    bool unmap_flag;
+    string read_name;
 
-    coder[71] = 0;
-    coder[103] = 0;
-
-    coder[65+c] = 1;
-    coder[97+c] = 1;
-
-    coder[84+c] = 0;
-    coder[116+c] = 0;
-
-    coder[67+c] = 1;
-    coder[99+c] = 1;
-
-    coder[71+c] = 0;
-    coder[103+c] = 0;
-
-    coder[65+2*c] = 1;
-    coder[97+2*c] = 1;
-
-    coder[84+2*c] = 0;
-    coder[116+2*c] = 0;
-
-    coder[67+2*c] = 0;
-    coder[99+2*c] = 0;
-
-    coder[71+2*c] = 1;
-    coder[103+2*c] = 1;
-
-    return coder;
-}
-
-int * generate_base(int k)
-{
-    static int base [32];
-    for (int i = 0; i<k; i++){       
-        base[i] = pow(2, k-i-1);
-    }
-    return base;
-}
-
-char * generate_complement(void)
-{
-    static char comple [256];
-    for (int j = 0; j < 256; j++){
-        comple[j] = 0;
-    }
-    comple[65] = 84;
-    comple[97] = 84;
-    comple[116] = 65;
-    comple[84] = 65;
-    comple[99] = 71;
-    comple[67] = 71;
-    comple[103] = 67;
-    comple[71] = 67;
-    return comple;
-}
-
-short * random_coder(int k)
-{
-    static short permu[18] = {0,1,2,0,2,1,1,2,0,1,0,2,2,0,1,2,1,0};
-    static short choose_coder[100];
-    int r;
-    unsigned seed;
-    seed = time(0);
-    srand(seed);
-    for (int j = 0; j < k; j++){
-        r = rand() % 6;
-        // cout << r << endl;
-        for (int i = 0; i < coder_num; i++){
-            choose_coder[j*3+i] = permu[r*3+i];
-            // cout << choose_coder[j*3+i]<<"#"<<permu[r*3+i] << endl;
-        }
-    }
-    // for (int j = 0; j < 100; j++){
-    //         cout << j <<"\t" << choose_coder[j] << endl;
-    // }
-    return choose_coder;
-}
-
-short * saved_random_coder(string index_name){
-    ifstream index_file;
-    static short read_choose_coder[100];
-    long i = 0;
-    unsigned int real_index;
-    index_file.open(index_name, ios::in | ios::binary);   
-    while (!index_file.eof()){
-        index_file.read(reinterpret_cast<char*>(&real_index), sizeof(unsigned int));
-        if (i < 100){
-            read_choose_coder[i] = real_index;
-        }
-        else{
+    while (getline(fq_file,reads_seq))
+    {
+        if (add_size>=end){
             break;
         }
-        i += 1;  
+        add_size += reads_seq.length();
+
+        if (lines % 4 == 1){
+            read_len = reads_seq.length();//cal read length
+            r = rand() % 100 ;
+            if (r < down_sam_ratio){
+                for (int j = 0; j < read_len; j++){
+                    reads_int[j] = (int)reads_seq[j];
+                    reads_comple_int[j] = encoder.comple[reads_int[j]];
+                }
+                int hit_kmer_num = 0;
+                for (int j = 0; j < read_len-encoder.k+1; j++){
+                    bool hit_flag = false;
+                    for (int i = 0; i < 3; i++){
+                        kmer_index, comple_kmer_index = 0, 0;
+                        all_valid = true;
+                        for (int z = 0; z<encoder.k; z++){
+                            m = encoder.coder[c*encoder.choose_coder[z*3+i]+reads_int[j+z]]; // choose_coder[z*3+i] indicate which coder
+                            n = encoder.coder[c*encoder.choose_coder[(k-1-z)*3+i]+reads_comple_int[j+z]];
+                            if (m == 5){
+                                all_valid = false;
+                                break;
+                            }
+                            kmer_index += m*encoder.base[z]; 
+                            comple_kmer_index += n*encoder.base[(encoder.k-1-z)];     
+                        }
+                        if (kmer_index > comple_kmer_index){ //use a smaller index
+                            real_index = comple_kmer_index;
+                        }   
+                        else{
+                            real_index = kmer_index;
+                        }
+                        if ((int)map_kmer_table[real_index] > 0 & all_valid == true ){
+                            hit_flag = true;
+                        }  
+                    }
+                    if (hit_flag){
+                        hit_kmer_num += 1;
+                    }
+                }
+                if (hit_kmer_num < 50){ // determine if a read is unmap 
+                    unmap_flag = true;
+                }
+            }         
+        }
+        else{
+            if (lines % 4 == 0){
+                unmap_flag = false;
+                read_index += 1;
+                read_name = get_read_ID(reads_seq);
+            }
+        }        
+        if (lines % 4 == 3 & unmap_flag){
+            // cout << read_name << endl;
+            unmap_fq_file << read_name << endl;
+        }
+        lines++;
     }
-    index_file.close(); 
-    return read_choose_coder;
+    fq_file.close();
+    unmap_fq_file.close();
 }
+
 
 int cal_sam_ratio(string fq1, long down_sampling_size){
     int down_sam_ratio = 0;
@@ -883,8 +836,7 @@ int cal_sam_ratio(string fq1, long down_sampling_size){
     return down_sam_ratio;
 }
 
-long file_size(string filename)  
-{  
+long file_size(string filename){  
     struct stat statbuf;  
     stat(filename.c_str(),&statbuf);  
     long size=statbuf.st_size;   
@@ -943,6 +895,8 @@ long * split_ref(string index_name, string fasta_file, int thread_num){
     return split_ref_cutoffs;
 }
 
+
+
 int main( int argc, char *argv[])
 {
     unsigned seed;
@@ -957,10 +911,13 @@ int main( int argc, char *argv[])
     k = stod(argv[4]); // kmer length
     low_depth = stod(argv[5]); // lower than this value will not be regarded as k-mer hit
     thread_num = stod(argv[6]);
-    string match_rate_file = argv[7]; // output file, the match rate of each fasta
+    string outdir = argv[7]; // 
     array_size = pow(2, k);
     kmer_count_table = new char[array_size];
-    int down_sam_ratio = stod(argv[8]); // percentage 30
+    int down_sam_ratio = stod(argv[8]); // percentage (0-100), randomly select reads with this probability, 30
+    string ID = argv[9]; // sample ID
+
+    string match_rate_file = outdir + "/" + ID + ".match_rate.csv"; //output file, the match rate of each fasta
 
     // string fq1 = argv[1];
     // string fq2 = argv[2];  
@@ -973,31 +930,16 @@ int main( int argc, char *argv[])
     // array_size = pow(2, k);
     // kmer_count_table = new char[array_size];
     
-
     Encode encoder;
     encoder.constructer(k);
-
     
-
-
-    
-    // string fq1 = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis//fastq/FDAARGOS_222.1.fq";
-    // string fq2 = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/sim_s_lugdunensis//fastq/FDAARGOS_222.2.fq";
-    // string fasta_file = "/mnt/d/breakpoints/assembly/simulation/assembly_test/Staphylococcus_lugdunensis/GCF_008728755.1/GCF_008728755.1_ASM872875v1_genomic.fna";
-
-    string index_name = "no use"; //fasta_file + ".k" + to_string(k) + ".index.dat";
-    
-    
+    std::vector<std::thread>threads;
     long start = 0;
     long end = 0;
     long size = file_size(fq1);
-    long each_size = size/thread_num;
+    long each_size = size/thread_num;  
+    cout <<"reads size\t"<<size<<endl;
     
-    cout <<"size\t"<<size<<endl;
-    
-    
-    std::vector<std::thread>threads;
-
     for (int i=0; i<thread_num; i++){
         start = i*each_size;
         end = (i+1)*each_size;
@@ -1021,28 +963,92 @@ int main( int argc, char *argv[])
 	for (auto&th : threads)
 		th.join();
     threads.clear();
+
     time_t now2 = time(0);
     cout << "reads are loaded. "<< now2 - now1<<endl;
 
-
-
     Select_ref select;
     string select_genome = select.check_each_genome(fasta_list, encoder, match_rate_file); //"/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/fasta/s_lugdunensis.database"
+    time_t now3 = time(0);
+    cout << "ref is selected. "<< now3 - now2<<endl;
+
+    memset(kmer_count_table, 0, sizeof(kmer_count_table));
+    down_sam_ratio = 100;
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        threads.push_back(thread(read_fastq, fq1, encoder, down_sam_ratio, start, end));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
+  
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        threads.push_back(thread(read_fastq, fq2, encoder, down_sam_ratio, start, end));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
+
+    time_t now4 = time(0);
+    cout << "reads are reloaded. "<< now4 - now3<<endl;
+
+    Fasta fasta;
+    string ref_seq = fasta.get_ref_seq(select_genome);
+    int ref_len = ref_seq.length();
+    char* kmer_hit_array = read_ref(ref_seq, encoder);
+    
+
+    Unmap unmap;
+    unmap.get_unmap(kmer_hit_array, ref_len);
+    unmap.get_map_kmer(encoder, ref_seq);
+    unmap.output_map_segments(select_genome, ref_seq, outdir, ID);
+    time_t now5 = time(0);
+    cout << "Getting map interval is done. "<< now5 - now4 << endl;
+
+
+   
+    down_sam_ratio = 100;
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        threads.push_back(thread(get_unmap_fastq, fq1, encoder, down_sam_ratio, start, end, unmap.map_kmer_table));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
+
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        threads.push_back(thread(get_unmap_fastq, fq2, encoder, down_sam_ratio, start, end, unmap.map_kmer_table));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
+
+    time_t now6 = time(0);
+    cout << "Get unmap reads. "<< now6 - now5 << endl;
+    cout << "Whole process takes  "<< now6 - now1 << endl;
+
+    // delete [] kmer_count_table; 
+    // delete [] unmap.map_kmer_table;
 
     return 0;
 }
 
-// Fasta fasta;
-// string ref_seq = fasta.get_ref_seq(fasta_file);
-// int ref_len = ref_seq.length();
-// char* kmer_hit_array = read_ref(ref_seq, encoder, index_name);
-// Unmap unmap;
-// unmap.get_unmap(kmer_hit_array, ref_len);
-// unmap.get_map_kmer(encoder, ref_seq);
-// unmap.get_unmap_reads(fq1, encoder);
-// time_t now3 = time(0);
-// cout << "read ref done. "<< now3 - now2 << endl;
-// unmap.get_unmap_reads(fq2, encoder);
-// unmap.output_map_segments(fasta_file, ref_seq, outdir, ID);
-// time_t now4 = time(0);
-// cout << "Get unmap reads. "<< now4 - now3 << endl;
+
