@@ -31,6 +31,7 @@ int k;
 char *kmer_count_table;
 char *map_kmer_table; // all kmers of mapped region
 long array_size;
+int least_read_kmer_num;
 // vector<string> record_read_mapping_list;
 
 // const unsigned char low_depth = 10;
@@ -705,9 +706,10 @@ void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long
                         hit_kmer_num += 1;
                     }
                 }
-                if (hit_kmer_num < 50){ // determine if a read is unmap 
+                if (hit_kmer_num < least_read_kmer_num){ // determine if a read is unmap 
                     unmap_flag = true;
                 }
+                // cout <<lines <<" "<<hit_kmer_num<<endl;
                 
             }         
         }
@@ -835,6 +837,7 @@ int main( int argc, char *argv[])
     kmer_count_table = new char[array_size];
     int down_sam_ratio = stod(argv[8]); // percentage (0-100), randomly select reads with this probability, 30
     string ID = argv[9]; // sample ID
+    least_read_kmer_num = stod(argv[10]); // kmer num less than this will be regarded as unmapped
     string match_rate_file = outdir + "/" + ID + ".match_rate.csv"; //output file, the match rate of each fasta
 
     

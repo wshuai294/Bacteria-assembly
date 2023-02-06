@@ -33,7 +33,7 @@ def extract_read_name(unmap_reads_file):
     read_name_dict = {}
     f = open(unmap_reads_file, 'r') 
     for line in f:
-        read_name = line[1:].strip()
+        read_name = line.strip()
         read_name_dict[read_name] = 1
     f.close()
     return read_name_dict
@@ -49,10 +49,10 @@ def extract_single_reads(focus_read_name_dict, other_read_name_dict, raw_fastq, 
     i = 0
     for line in f:
         if i % 4 == 0:
-            read_name = line.strip().split("/")[0]
+            read_name = line[1:].strip().split("/")[0]
              
             if read_name in other_read_name_dict:
-                # print ("*********************")
+                # 
                 if_paired = True
             else:
                 if_paired = False
@@ -67,8 +67,9 @@ def extract_single_reads(focus_read_name_dict, other_read_name_dict, raw_fastq, 
     f.close()
 
 def main():
-    combine_frag()
+    # combine_frag()
     fq1_read_name_dict = extract_read_name(unmap_reads_file_fq1)
+    # print (fq1_read_name_dict)
     fq2_read_name_dict = extract_read_name(unmap_reads_file_fq2)
     extract_single_reads(fq1_read_name_dict, fq2_read_name_dict, raw_fq1, fq1, fqs, "initial")
     extract_single_reads(fq2_read_name_dict, fq1_read_name_dict, raw_fq2, fq2, fqs, "not initial")
