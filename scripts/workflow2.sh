@@ -23,13 +23,13 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-# $dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 30 $ID 100
-# cat $outdir/$ID.map.fasta > $seg_ref
+$dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 30 $ID 100
+cat $outdir/$ID.map.fasta > $seg_ref
 
 python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
 gzip -f $sample.unmapped.*fq
 
-:<<!
+# :<<!
 rm -r $outdir/ass
 echo "start spades..."
 spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
