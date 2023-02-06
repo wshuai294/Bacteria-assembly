@@ -3,7 +3,7 @@
 # sudo apt -y install delly
 # gnuplot
 
-ref=$1
+ref_db=$1
 fq1=$2
 fq2=$3
 ID=$4
@@ -23,13 +23,13 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-$dir/segmentation $fq1 $fq2 $ref $outdir $ID
+$dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 30 $ID 
 cat $outdir/$ID.map.fasta > $seg_ref
 
-python $dir/classify_unmap_reads.py $fq1.unmap.fq  $fq2.unmap.fq $outdir $ID
+python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
 gzip -f $sample.unmapped.*fq
 
-
+:<<!
 rm -r $outdir/ass
 echo "start spades..."
 spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
@@ -62,7 +62,7 @@ end=$(date +%s)
 take=$(( end - start ))
 echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
-!
+
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
@@ -89,3 +89,4 @@ cat $sample.contigs.fasta |bcftools consensus -H 1 $sample.contigs_q20.recode.vc
 end=$(date +%s)
 take=$(( end - start ))
 echo six Time taken to map reads is ${take} seconds. # >> ${sample}.log
+!

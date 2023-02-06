@@ -8,7 +8,7 @@ fq1=$2
 fq2=$3
 ID=$4
 outdir=$5
-true=$6
+# true=$6
 
 sample=$outdir/$ID
 ins_ref=$outdir/$ID.ins.fa
