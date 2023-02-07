@@ -67,7 +67,7 @@ def extract_single_reads(focus_read_name_dict, other_read_name_dict, raw_fastq, 
     f.close()
 
 def main():
-    # combine_frag()
+    combine_frag()
     fq1_read_name_dict = extract_read_name(unmap_reads_file_fq1)
     # print (fq1_read_name_dict)
     fq2_read_name_dict = extract_read_name(unmap_reads_file_fq2)

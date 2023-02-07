@@ -23,8 +23,8 @@ using namespace std;
 const short c = 300;
 const char coder_num = 3;
 const unsigned char least_depth = 127;
-const unsigned int window_size = 10000;
-const unsigned int window_min_hit = 9500;
+const unsigned int window_size = 1000;
+const unsigned int window_min_hit = 980;
 
 unsigned char low_depth;
 int k;
