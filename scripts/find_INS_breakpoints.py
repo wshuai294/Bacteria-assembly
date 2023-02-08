@@ -10,7 +10,7 @@ import re
 import os
 from sklearn.cluster import DBSCAN
 
-min_clipped_len = 50
+min_clipped_len = 30
 
 def check_clipped(read):
     flag = False
@@ -49,7 +49,7 @@ def ins_bps(bamname):
         position_list = position_dict[chrom_name]
         # print (position_list)
         position_list = np.array(position_list).reshape(-1, 1)
-        clustering = DBSCAN(eps=10, min_samples=10).fit(position_list)
+        clustering = DBSCAN(eps=100, min_samples=2).fit(position_list)
         cluster_num = max(clustering.labels_) + 1
         
         save_clusters = []

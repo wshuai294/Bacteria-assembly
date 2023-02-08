@@ -36,15 +36,15 @@ def main():
         # # output the softclipped part of reads
 
     ########## extract the reads mapped to short segments   
-    # f = open(short_segs, "r")
-    # for line in f:
-    #     array = line.strip().split()
-    #     chrom, start, end = array[0], int(array[1]), int(array[2])
-    #     for read in samfile.fetch(chrom, start, end):
-    #         filter_file.write(read)
+    f = open(short_segs, "r")
+    for line in f:
+        array = line.strip().split()
+        chrom, start, end = array[0], int(array[1]), int(array[2])
+        for read in samfile.fetch(chrom, start, end):
+            filter_file.write(read)
 
-    # filter_file.close()
-    # samfile.close()
+    filter_file.close()
+    samfile.close()
 
 
 if __name__ == "__main__":
