@@ -8,7 +8,7 @@ import re
 origin_ref = sys.argv[1]
 clean_ref = sys.argv[2]
 blast_file = sys.argv[3]
-min_repeat_len = 30
+min_repeat_len = 10
 end_gap = 20
 
 

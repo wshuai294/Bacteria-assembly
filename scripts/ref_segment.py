@@ -152,8 +152,14 @@ class My_bkps():
 
     def read_additional_ins_pos(self): # scan reads, find clipped reads
         cluster_central = ins_bps(bam_file)
+        # print ("###########", cluster_central)
         for central in cluster_central:
             self.add_lumpy(central[0], central[1])
+
+        with open(short_ins_pos, "r") as f:
+            for line in f:
+                chrom, pos = line.strip().split("\t")
+                self.add_lumpy(chrom, int(pos))
 
     def add_lumpy(self, chrom, pos):
         if chrom in self.all_pos.keys():
@@ -324,13 +330,14 @@ if __name__ == "__main__":
     depth_file = sys.argv[4]
     bam_file = sys.argv[5]
     short_segs = sys.argv[6]
+    short_ins_pos = sys.argv[7]
 
     bed_file = ref_file + ".bed"
 
 
     min_gap = 20
     MIN_SEG_LEN = 50  #50
-    MIN_SEG_LEN_NEW = 10000
+    MIN_SEG_LEN_NEW = 10000 # 10000
     min_sv_len = MIN_SEG_LEN
     min_exist_len = MIN_SEG_LEN
     min_mapped_ratio = 0.8

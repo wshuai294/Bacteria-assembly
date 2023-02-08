@@ -33,7 +33,10 @@ samtools index $sample.init.bam
 samtools depth $sample.init.bam >$sample.init.depth
 delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
 bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
-python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt
+svaba run -t $sample.init.bam -G $ref -a $sample -p $threads
+python $dir/extract_short_insertions.py $sample.svaba.indel.vcf $sample.short.INS.fasta $sample.short.INS.pos.txt
+python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt
+cat $sample.short.INS.fasta >>$seg_ref
 
 end=$(date +%s)
 take=$(( end - start ))
@@ -45,13 +48,17 @@ samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unma
 gzip -f $sample.unmapped.*fq
 rm -r $outdir/ass
 echo "start spades..."
-spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
+spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz -o $outdir/ass >$sample.spades.log
 python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100
 cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
 end=$(date +%s)
 take=$(( end - start ))
 echo two Time taken to map reads is ${take} seconds. # >> ${sample}.log
+
+# blastn -subject $seg_ref -query $seg_ref -out $sample.blast.txt -outfmt 6 #remove the overlap between contig and ref-segments
+# python $dir/delete_repeat.py $seg_ref $seg_ref.new $sample.blast.txt
+# mv $seg_ref.new $seg_ref
 
 
 bwa index $seg_ref
@@ -75,11 +82,10 @@ end=$(date +%s)
 take=$(( end - start ))
 echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
-!
+
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
-# samtools dict -o $sample.contigs.dict $sample.contigs.fasta
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
   | samtools view -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
@@ -88,9 +94,12 @@ samtools index $sample.contigs.bam
 end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to map reads is ${take} seconds. # >> ${sample}.log
-# !
 freebayes -f $sample.contigs.fasta -p 1 $sample.contigs.bam >$sample.contigs.vcf
-# /home/wangshuai/softwares/gatk-4.3.0.0/gatk HaplotypeCaller -ploidy 1 -I $sample.contigs.bam -O $sample.contigs.vcf -R $sample.contigs.fasta 
+# delly call -g $sample.contigs.fasta -o $sample.new.sv.bcf $sample.contigs.bam
+# bcftools view $sample.new.sv.bcf >$sample.new.sv.vcf
+# svaba run -t $sample.contigs.bam -G $sample.contigs.fasta -a $sample.svaba_2_
+
+
 end=$(date +%s)
 take=$(( end - start ))
 echo five Time taken to map reads is ${take} seconds. # >> ${sample}.log
@@ -99,9 +108,6 @@ bgzip -f $sample.contigs_q20.recode.vcf
 tabix -f $sample.contigs_q20.recode.vcf.gz
 cat $sample.contigs.fasta |bcftools consensus -H 1 $sample.contigs_q20.recode.vcf.gz >$sample.contigs.consensus.fasta
 
-
-
-# python3 $dir/measure_blast.py $true $sample $sample.contigs.consensus.fasta
 
 end=$(date +%s)
 take=$(( end - start ))

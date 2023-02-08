@@ -10,17 +10,22 @@ import re
 import os
 from sklearn.cluster import DBSCAN
 
-min_clipped_len = 30
+min_clipped_len = 50
 
 def check_clipped(read):
     flag = False
+    start = True
+    locus_estimate = 0
     clipped_len = 0
     for ci in read.cigar: # record left clipped length
         if ci[0] == 4 or ci[0] == 5:
             clipped_len += int(ci[1])
+        elif start and ci[0] == 0: # the locus start from xxM, should + length
+            locus_estimate = int(ci[1])
+        start = False
     if clipped_len >= min_clipped_len:
         flag = True
-    return flag
+    return flag, locus_estimate
 
 
 def ins_bps(bamname):
@@ -31,18 +36,20 @@ def ins_bps(bamname):
         if read.mapping_quality < 20:
             continue
         if read.is_unmapped == False and read.mate_is_unmapped == True: 
-            if check_clipped(read):
+            flag, locus_estimate = check_clipped(read)
+            if flag:
                 if read.reference_name not in position_dict:
                     position_dict[read.reference_name] = []
-                position_dict[read.reference_name].append(read.reference_start)
+                position_dict[read.reference_name].append(read.reference_start + locus_estimate)
                 # print (read)
     cluster_central = []
 
 
     for chrom_name in position_dict: # for each chrom
         position_list = position_dict[chrom_name]
+        # print (position_list)
         position_list = np.array(position_list).reshape(-1, 1)
-        clustering = DBSCAN(eps=100, min_samples=2).fit(position_list)
+        clustering = DBSCAN(eps=10, min_samples=10).fit(position_list)
         cluster_num = max(clustering.labels_) + 1
         
         save_clusters = []
