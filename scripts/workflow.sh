@@ -23,7 +23,7 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-# :<<!
+:<<!
 bwa index $ref
 samtools faidx $ref
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
@@ -31,11 +31,12 @@ bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
 samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
 samtools depth $sample.init.bam >$sample.init.depth
-delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
-bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
+# delly call -g $ref -o $sample.delly.sv.bcf $sample.init.bam
+# bcftools view $sample.delly.sv.bcf >$sample.delly.sv.vcf
 svaba run -t $sample.init.bam -G $ref -a $sample -p $threads
 python $dir/extract_short_insertions.py $sample.svaba.indel.vcf $sample.short.INS.fasta $sample.short.INS.pos.txt
-python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt
+# python3 $dir/ref_segment.py $ref $seg_ref $sample.delly.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt
+python3 $dir/ref_segment.py $ref $seg_ref $sample.svaba.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt
 cat $sample.short.INS.fasta >>$seg_ref
 
 end=$(date +%s)
@@ -56,9 +57,7 @@ end=$(date +%s)
 take=$(( end - start ))
 echo two Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
-# blastn -subject $seg_ref -query $seg_ref -out $sample.blast.txt -outfmt 6 #remove the overlap between contig and ref-segments
-# python $dir/delete_repeat.py $seg_ref $seg_ref.new $sample.blast.txt
-# mv $seg_ref.new $seg_ref
+
 
 
 bwa index $seg_ref
@@ -90,25 +89,40 @@ bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq
   | samtools view -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
-
+!
 end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to map reads is ${take} seconds. # >> ${sample}.log
-freebayes -f $sample.contigs.fasta -p 1 $sample.contigs.bam >$sample.contigs.vcf
+# freebayes -f $sample.contigs.fasta -p 1 $sample.contigs.bam >$sample.contigs.vcf
 # delly call -g $sample.contigs.fasta -o $sample.new.sv.bcf $sample.contigs.bam
 # bcftools view $sample.new.sv.bcf >$sample.new.sv.vcf
 # svaba run -t $sample.contigs.bam -G $sample.contigs.fasta -a $sample.svaba_2_
-
-
 end=$(date +%s)
 take=$(( end - start ))
 echo five Time taken to map reads is ${take} seconds. # >> ${sample}.log
-vcftools --vcf $sample.contigs.vcf --minQ 20 --recode --recode-INFO-all --out $sample.contigs_q20
-bgzip -f $sample.contigs_q20.recode.vcf
-tabix -f $sample.contigs_q20.recode.vcf.gz
-cat $sample.contigs.fasta |bcftools consensus -H 1 $sample.contigs_q20.recode.vcf.gz >$sample.contigs.consensus.fasta
+# vcftools --vcf $sample.contigs.vcf --minQ 20 --recode --recode-INFO-all --out $sample.contigs_q20
+# bgzip -f $sample.contigs_q20.recode.vcf
+# tabix -f $sample.contigs_q20.recode.vcf.gz
+# cat $sample.contigs.fasta |bcftools consensus -H 1 $sample.contigs_q20.recode.vcf.gz >$sample.contigs.consensus.fasta
+
+
+
+# bwa index $sample.contigs.consensus.fasta
+# samtools faidx $sample.contigs.consensus.fasta
+# bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.consensus.fasta $fq1 $fq2 \
+#   | samtools view -bhS -> $sample.contigs.new.unsort.bam
+# samtools sort -o $sample.contigs.new.bam $sample.contigs.new.unsort.bam
+# samtools index $sample.contigs.new.bam
+# svaba run -t $sample.contigs.new.bam -G $sample.contigs.consensus.fasta -a $sample.svaba_new_
+python $dir/polish_contigs.py $sample.svaba_new_.svaba.sv.vcf $sample.contigs.consensus.fasta $sample.contigs.consensus.split.fasta
+
 
 
 end=$(date +%s)
 take=$(( end - start ))
 echo six Time taken to map reads is ${take} seconds. # >> ${sample}.log
+
+
+# blastn -subject $seg_ref -query $seg_ref -out $sample.blast.txt -outfmt 6 #remove the overlap between contig and ref-segments
+# python $dir/delete_repeat.py $seg_ref $seg_ref.new $sample.blast.txt
+# mv $seg_ref.new $seg_ref
