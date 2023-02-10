@@ -1,4 +1,4 @@
-# requirments: bwa samtools spades(download binary) lumpyexpress blast freebayes vcftools mummer
+# requirments: bwa samtools spades(download binary) lumpyexpress blast freebayes vcftools mummer svaba vcflib GNU-parallele
 # python modules: pysam  pyyaml Biopython scikit-learn pyfaidx matplotlib pandas seaborn networkx
 
 
@@ -19,13 +19,17 @@ mkdir $outdir
 
 
 map_qual=20
-threads=15
+threads=10
 
 $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
-ref=$(awk -F',' 'BEGIN { max = 0 } 
-         { if($2>max) { max=$2; val=$1 } } 
-         END { print val }' $sample.match_rate.csv)
-echo "selected ref is $ref."
+# ref=$(awk -F',' 'BEGIN { max = 0 } 
+#          { if($2>max) { max=$2; val=$1 } } 
+#          END { print val }' $sample.match_rate.csv)
+highest=$(awk -F',' 'BEGIN { max = 0 } 
+         { if($2>max) { max=$2; val=$1; second_col=$2 } } 
+         END { print val "," second_col }' $sample.match_rate.csv)
+ref=$(echo $highest | awk -F',' '{print $1}')
+echo "selected ref is $highest."
 
 # :<<!
 bwa index $ref
@@ -53,7 +57,7 @@ if [ -d "$outdir/ass" ]; then
 fi
 echo "start spades..."
 spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz -o $outdir/ass >$sample.spades.log
-python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100
+python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100 # original 100
 if [ -f "$outdir/ass/contigs.filter.fasta" ]; then
   cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 fi
@@ -105,3 +109,9 @@ python $dir/polish_contigs.py $sample.contigs.vcf $sample.svaba_2_.svaba.indel.v
 end=$(date +%s)
 take=$(( end - start ))
 echo five Time taken to variants is ${take} seconds. # >> ${sample}.log
+
+echo ""
+echo ""
+echo "**************Assembly Finishied*****************"
+echo ""
+echo ""

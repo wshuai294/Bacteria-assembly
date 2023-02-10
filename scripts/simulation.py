@@ -102,6 +102,7 @@ class Simulation():
                 ID = ID.replace(")", "_")
                 ID = ID.replace("-", "_")
                 ID = ID.replace(" ", "_")
+                ID = ID.replace("/", "_")
                 f.close()
                 self.generate_fastq(ID, genome)
                 print (ID, genome, file = tru)
