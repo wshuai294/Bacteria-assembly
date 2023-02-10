@@ -31,7 +31,7 @@ highest=$(awk -F',' 'BEGIN { max = 0 }
 ref=$(echo $highest | awk -F',' '{print $1}')
 echo "selected ref is $highest."
 
-:<<!
+# :<<!
 bwa index $ref
 samtools faidx $ref
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
@@ -109,7 +109,7 @@ python $dir/polish_contigs.py $sample.contigs.vcf $sample.svaba_2_.svaba.indel.v
 end=$(date +%s)
 take=$(( end - start ))
 echo five Time taken to variants is ${take} seconds. # >> ${sample}.log
-!
+# !
 echo ""
 echo ""
 echo "**************Assembly Finishied*****************"
