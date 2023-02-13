@@ -109,6 +109,7 @@ class Benchmark():
         self.get_para(run_script)
         self.spades_dir = self.our_dir.replace("our", "spades")
         # self.our_dir = "/home/wangshuai/assembly_result/w3_test/"
+        self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli/"
         self.data = []
         
 
@@ -216,8 +217,8 @@ class Quast():
         self.base_error = self.mismatch_rate + self.indel_rate
 
 if __name__ == "__main__":
-    # run_script = "/mnt/d/breakpoints/assembly/sim/run.sh"
-    run_script = "/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/run.sh"
+    run_script = "/mnt/d/breakpoints/assembly/sim/run.sh"
+    # run_script = "/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/run.sh"
     ben = Benchmark(run_script)
     ben.main()
     ben.compar_ave()

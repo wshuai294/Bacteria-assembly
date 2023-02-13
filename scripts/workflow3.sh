@@ -22,9 +22,6 @@ map_qual=20
 threads=10
 
 $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
-# ref=$(awk -F',' 'BEGIN { max = 0 } 
-#          { if($2>max) { max=$2; val=$1 } } 
-#          END { print val }' $sample.match_rate.csv)
 highest=$(awk -F',' 'BEGIN { max = 0 } 
          { if($2>max) { max=$2; val=$1; second_col=$2 } } 
          END { print val "," second_col }' $sample.match_rate.csv)
@@ -61,6 +58,10 @@ python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.f
 if [ -f "$outdir/ass/contigs.filter.fasta" ]; then
   cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 fi
+
+blastn -subject $seg_ref -query $seg_ref -out $sample.blast.txt -outfmt 6 #remove the overlap between contig and ref-segments
+python $dir/delete_repeat.py $seg_ref $seg_ref.new $sample.blast.txt
+mv $seg_ref.new $seg_ref
 
 end=$(date +%s)
 take=$(( end - start ))
