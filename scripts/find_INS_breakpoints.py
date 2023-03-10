@@ -47,7 +47,7 @@ def ins_bps(bamname):
 
     for chrom_name in position_dict: # for each chrom
         position_list = position_dict[chrom_name]
-        # print (position_list)
+        # print (chrom_name, sorted(position_list))
         position_list = np.array(position_list).reshape(-1, 1)
         clustering = DBSCAN(eps=100, min_samples=2).fit(position_list)
         cluster_num = max(clustering.labels_) + 1
@@ -59,7 +59,7 @@ def ins_bps(bamname):
             save_clusters[clustering.labels_[j]].append(position_list[j])
         for i in range(cluster_num):
             central = round(np.median(save_clusters[i]))
-            # print (chrom_name, central)
+            # print ("breakpoint cluster", chrom_name, central)
             cluster_central.append([chrom_name, central])
         # print (position_list, clustering.labels_)
     return cluster_central

@@ -52,6 +52,16 @@ def map_ratio(read):
 #     bamfile.close()
 #     return good_read_dict
 
+def get_ref_len(ref_name):
+    if len(ref_name.split(':')) < 2:
+        ref_len = int(ref_name.split('_')[3])
+    elif re.search("%", ref_name):
+        # print (ref_name, ref_name.split('%'))
+        ref_len = int(ref_name.split('%')[2]) -  int(ref_name.split('%')[1])
+    else:
+        ref_len = int(ref_name.split(':')[1].split('-')[1]) - int(ref_name.split(':')[1].split('-')[0])
+    return ref_len
+
 def calCrossReads(bam_name):
     # good_read_dict = filter_bam(bam_name)
     f = open(graph, "w")
@@ -60,7 +70,7 @@ def calCrossReads(bam_name):
     mean, sdev, rlen = getInsertSize(bamfile)
     rlen = int(rlen)
     insert_size = int(mean + 2*sdev) + 2 * rlen
-    test_read_name = "NZ_CP020763.1_1916841_1917378_0:0:0_0:0:0_c3ac5"
+    # test_read_name = "NZ_CP020763.1_1916841_1917378_0:0:0_0:0:0_c3ac5"
     count = 0
     for read in bamfile.fetch():
         # if read.query_name == test_read_name:
@@ -84,16 +94,16 @@ def calCrossReads(bam_name):
         #     print (read.query_name)
         if map_ratio(read) < min_map_ratio:
             continue
-        if len(read.reference_name.split(':')) < 2:
-            ref_len = int(read.reference_name.split('_')[3])
-        else:
-            ref_len = int(read.reference_name.split(':')[1].split('-')[1]) - int(read.reference_name.split(':')[1].split('-')[0])
-            
-        
-        if len(read.next_reference_name.split(':')) < 2:
-            mate_len = int(read.next_reference_name.split('_')[3])
-        else:
-            mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
+        # if len(read.reference_name.split(':')) < 2:
+        #     ref_len = int(read.reference_name.split('_')[3])
+        # else:
+        #     ref_len = int(read.reference_name.split(':')[1].split('-')[1]) - int(read.reference_name.split(':')[1].split('-')[0])
+        ref_len = get_ref_len(read.reference_name)
+        mate_len = get_ref_len(read.next_reference_name)
+        # if len(read.next_reference_name.split(':')) < 2:
+        #     mate_len = int(read.next_reference_name.split('_')[3])
+        # else:
+        #     mate_len = int(read.next_reference_name.split(':')[1].split('-')[1]) - int(read.next_reference_name.split(':')[1].split('-')[0])
         if not (abs(read.reference_start) < insert_size or abs(ref_len - read.reference_start)< insert_size):
             continue
         if not (abs(read.next_reference_start) < insert_size or abs(mate_len - read.next_reference_start)< insert_size):
@@ -103,6 +113,8 @@ def calCrossReads(bam_name):
             sys.exit()
         if  chrom_copy[read.reference_name] == 0 or  chrom_copy[read.next_reference_name] == 0:
             # print ("The copy of one seg is zero in the edge, thus deleted.", read.reference_name, read.next_reference_name)
+            continue
+        if re.search("NODE_", read.reference_name) and re.search("NODE_", read.next_reference_name): # delete edge between two contigs
             continue
 
         if read.is_reverse:
@@ -115,8 +127,8 @@ def calCrossReads(bam_name):
             mate_ref = read.next_reference_name + " +"
 
         edge = refname + " " + mate_ref
-        if read.query_name == test_read_name:
-            print (read.query_name, "final", edge)
+        # if edge == "NODE_2_length_2160_cov_737.685070 - NZ_CP043539.1:4021280-4033717 +":
+        #     print (read.is_reverse, read.mate_is_reverse, read.query_name, read.cigarstring)
         if edge not in edge_dict:
             edge_dict[edge] = 1
         else:
@@ -129,9 +141,13 @@ def calCrossReads(bam_name):
         else:
             print ("Copy of SEG %s is zero, thus deleted."%(chrom), round(chrom_depth[chrom]))
     
+    remove_edges, my_nodes = remove_small_circle(edge_dict, chrom_copy, insert_size)
     for edge in edge_dict:
         if edge_dict[edge] < min_edge_dp:
-            print ("removed JUNC ", edge, round(edge_dict[edge]))
+            print ("removed JUNC due to low depth ", edge, round(edge_dict[edge]))
+            continue
+        if edge in remove_edges:
+            print ("removed JUNC due to triangle ", edge, round(edge_dict[edge]))
             continue
         print ("JUNC ", edge, round(edge_dict[edge]), file = f)
         # print (edge, edge_dict[edge])
@@ -160,11 +176,15 @@ def cal_copy_number():
         chrom_copy[chrom] = round(float(np.median(depth_dict[chrom]))/median_depth)
     return chrom_copy, median_depth, chrom_depth
 
-def remove_small_circle(edge_dict):
+def remove_small_circle(edge_dict, chrom_copy, insert_size):
+    #triangle led by the short middle seg
+    seg_length_dict = get_seg_len(chrom_copy)
     # discard
     my_graph = {}
     my_nodes = {}
     for edge in edge_dict:
+        if edge_dict[edge] < min_edge_dp:
+            continue
         array = edge.split()
         node1 = array[0] + " " + array[1]
         node2 = array[2] + " " + array[3]
@@ -185,10 +205,27 @@ def remove_small_circle(edge_dict):
                     continue
                 else:
                     for node3 in my_graph[node2]:
-                        if node3 in my_graph[node1]:
+                        if node3 in my_graph[node1] and seg_length_dict[node2[:-1].strip()] < insert_size:
                             edge = node1 + " " + node3
                             remove_edges[edge] = 1
     return remove_edges, my_nodes
+
+def get_seg_len(chrom_copy):
+    # calculate segment length according to its name
+    # print (chrom_copy)
+    seg_length_dict = {}
+    for seg in chrom_copy:
+        # array = seg.split("_")
+        # if array[0] != "NODE":
+        #     new_array = seg[:-1].split(":")[1].split("-")
+        #     # print (new_array)
+        #     length = abs(int(new_array[0]) - int(new_array[1]))  
+        # else:
+        #     length = int(array[3])
+        # seg_length_dict[seg] = length
+        seg_length_dict[seg] = get_ref_len(seg)
+    # print (seg_length_dict)
+    return seg_length_dict
 
 
 

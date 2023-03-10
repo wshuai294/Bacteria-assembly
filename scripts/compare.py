@@ -109,7 +109,8 @@ class Benchmark():
         self.get_para(run_script)
         self.spades_dir = self.our_dir.replace("our", "spades")
         # self.our_dir = "/home/wangshuai/assembly_result/w3_test/"
-        self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli/"
+        # self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli/"
+        self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli_new/"
         self.data = []
         
 

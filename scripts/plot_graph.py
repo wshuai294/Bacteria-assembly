@@ -56,17 +56,18 @@ def plot_net():
 
     DG.add_edges_from(edges_list, weight = 0.1)
     
-    # pos = nx.spring_layout(DG, seed=8)    
+    pos = nx.spring_layout(DG, seed=8)    
     # pos = nx.planar_layout(DG) 
-    pos = nx.kamada_kawai_layout(DG) 
+    # pos = nx.kamada_kawai_layout(DG) 
     # nx.draw(DG, pos, with_labels=True, node_size=50, width=1, font_size=5)
     options = {
     'node_color': 'blue',
     'node_size': 2,
-    'width': 0.5,
+    'width': 0.2,
     'font_size': 2,
     'arrowstyle': '-|>',
-    'arrowsize': 4,
+    'arrowsize': 2,
+    'alpha': 0.5,
 }
     nx.draw_networkx(DG, pos, arrows=True, **options)
     # nx.draw(DG, 

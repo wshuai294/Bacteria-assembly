@@ -9,6 +9,14 @@ original_ref = sys.argv[1]
 graph_file = sys.argv[2]
 contigs = sys.argv[3]
 
+from Bio import SeqIO
+
+def get_contig_lengths(fasta_file):
+    contig_lengths = {}
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        contig_lengths[record.id] = len(record.seq)
+    return contig_lengths
+
 
 def main():
     used_segs = {}
@@ -57,6 +65,9 @@ def main():
 def compute_node_length():
     f = open(graph_file, 'r')
     h = open(graph_file + ".length", 'w')
+    y = open(graph_file + ".ref.bed", 'w')
+    contig_lengths = get_contig_lengths(original_ref)
+
     contig_index = 1
     for line in f:
         line = line.strip()
@@ -70,18 +81,25 @@ def compute_node_length():
         for i in range(len(segs_list)):
             seg_name = segs_list[i][:-1]
             if re.search("NODE_", seg_name):
-                length = int(seg_name.split("_")[3])
+                # length = int(seg_name.split("_")[3])
+                length = contig_lengths[seg_name]
                 new_seg_name = seg_name
             else:
                 array = seg_name.split(":")[-1].split("-")
-                length = abs(int(array[1]) - int(array[0]))
+                # length = abs(int(array[1]) - int(array[0]))
+                length = contig_lengths[seg_name]
                 new_seg_name = seg_name + "_len_" + str(length)
+                print ("contig_%s\t%s\t%s"%(contig_index, accumu_len, accumu_len+length), file = y)
             accumu_len += length
             new_seg_name = new_seg_name + "_accu_" + str(accumu_len)
             print (new_seg_name, end = "\t", file = h)
         print ('', end = "\n", file = h)
+
+        contig_index += 1
+
     f.close()
     h.close()
+    y.close()
 
 
 main()

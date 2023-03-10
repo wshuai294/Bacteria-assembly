@@ -10,6 +10,7 @@ from pysam import VariantFile
 import re
 
 from find_INS_breakpoints import ins_bps
+from get_IS_breakpoints import IS_bkp, get_repeat_bkp
 
 
 
@@ -132,9 +133,11 @@ class My_bkps():
                 if sv_len < min_sv_len:
                     continue
                 self.add_lumpy(chrom, pos)
+                print ("SV", chrom, pos)
                 if array[4] == "<DEL>" or array[4] == "<DUP>":
                     pos_end = pos + sv_len
                     self.add_lumpy(chrom, pos_end)
+                    print ("DEL/DUP", chrom, pos_end)
             
             else:
                 fir = re.search("\[(.*?)\[", array[4])
@@ -149,17 +152,21 @@ class My_bkps():
                 # print (array[4], chrom, pos, abs(pos2 - pos))
                 if chrom2 == chrom and abs(pos2 - pos) < min_sv_len:
                     continue
+                # else:
+                #     self.add_lumpy(chrom, pos)
 
     def read_additional_ins_pos(self): # scan reads, find clipped reads
         cluster_central = ins_bps(bam_file)
         # print ("###########", cluster_central)
         for central in cluster_central:
             self.add_lumpy(central[0], central[1])
+            # print ("cluster", central[0], central[1])
 
         with open(short_ins_pos, "r") as f:
             for line in f:
                 chrom, pos = line.strip().split("\t")
                 self.add_lumpy(chrom, int(pos))
+                # print ("short INS", chrom, int(pos))
 
     def add_lumpy(self, chrom, pos):
         if chrom in self.all_pos.keys():
@@ -168,12 +175,14 @@ class My_bkps():
             self.all_pos[chrom]=[pos]
 
     def cluster_pos(self):
-        self.depth_segmentation()
+        
         for ref in self.all_pos:
             ref_pos_list = self.all_pos[ref]
+            # print ("before cluster breakpoints:", ref, ref_pos_list)
             ref_rep_pos_list = self.dbscan_clu(ref_pos_list)
             self.all_pos[ref] = ref_rep_pos_list
             # print (self.all_pos)
+            # print ("after cluster breakpoints:", ref, ref_rep_pos_list)
 
     def dbscan_clu(self, ref_pos_list):
         
@@ -318,8 +327,25 @@ class My_bkps():
                 self.all_pos[intes[0]] += [intes[1], intes[2]]
             else:
                 self.all_pos[intes[0]] = [intes[1], intes[2]]
+            # print ("Depth", intes[0], intes[1], intes[2])
         # for ref in self.all_pos:
         #     ref_pos_list = self.all_pos[ref]
+
+    def add_IS_bkp(self):
+        IS_bkp_list = IS_bkp(ref_file, sample)
+        for bkp in IS_bkp_list:
+            if bkp[0] in self.all_pos:
+                self.all_pos[bkp[0]].append(bkp[1])
+            else:
+                self.all_pos[bkp[0]] = [bkp[1]]
+
+    def add_repeat_bkp(self):
+        repeat_bkp_list = get_repeat_bkp(ref_file, sample)
+        for bkp in repeat_bkp_list:
+            if bkp[0] in self.all_pos:
+                self.all_pos[bkp[0]].append(bkp[1])
+            else:
+                self.all_pos[bkp[0]] = [bkp[1]]
 
 
 if __name__ == "__main__":
@@ -331,6 +357,7 @@ if __name__ == "__main__":
     bam_file = sys.argv[5]
     short_segs = sys.argv[6]
     short_ins_pos = sys.argv[7]
+    sample = sys.argv[8]
 
     bed_file = ref_file + ".bed"
 
@@ -346,9 +373,11 @@ if __name__ == "__main__":
 
     print ("separate reference...")
     my_bkps = My_bkps()
-    my_bkps.read_delly_vcf()
+    my_bkps.read_delly_vcf() # breakpoint by SV detection
     my_bkps.read_additional_ins_pos() # find some ins breakpoints by clipped reads
-    # my_bkps.read_lumpy_vcf()
-    # my_bkps.add_lumpy("NC_000913.3", 2948733)
+    my_bkps.depth_segmentation() # breakpoint found by depth
+    # my_bkps.add_IS_bkp() # breakpoint found by mapping ref to IS database
+    # my_bkps.add_repeat_bkp() # breakpoint found by mapping ref to itself
+    # my_bkps.all_pos["NZ_CP043539.1"].append(461018)
     my_bkps.cluster_pos()
     my_bkps.get_segments()
