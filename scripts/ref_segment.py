@@ -31,13 +31,13 @@ def check_clipped(read):
     return flag, pos_clip
 
 class My_bkps():
+
     def __init__(self):
         self.all_bkp = []
         self.all_pos = {}
         self.cluster_bandwidth = 50
         self.ref_len = {}
         self.get_ref_len()
-
         self.segments = []
     
     def add(self, one_bkp):

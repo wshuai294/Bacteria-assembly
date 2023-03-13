@@ -63,7 +63,7 @@ python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.f
 if [ -f "$outdir/ass/contigs.filter.fasta" ]; then
   cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 fi
-!
+
 # blastn -subject $seg_ref -query $seg_ref -out $sample.blast.txt -outfmt 6 #remove the overlap between contig and ref-segments
 # python $dir/delete_repeat.py $seg_ref $seg_ref.uniq.fa $sample.blast.txt
 # seg_ref=$seg_ref.uniq.fa
@@ -82,39 +82,59 @@ samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
-
+!
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
 # python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
-/home/wangshuai/softwares/seqGraph/build/matching --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
+/home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
+python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
 echo "matching is done..."
 end=$(date +%s)
 take=$(( end - start ))
 echo three Time taken to matching is ${take} seconds. # >> ${sample}.log
 
 
-python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
+##### polish the cotigs
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
   | samtools view -L $sample.solve.path.txt.ref.bed -bhS -> $sample.contigs.unsort.bam
-# samtools view -h $sample.contigs.unsort.bam | grep -v 'XA:Z:' | samtools view -b -o $sample.contigs.unsort.uniq.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
 end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.log
+# !
+pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 
+cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
+
+# python3 $dir/resolve_misassembly.py -i $sample.contigs.polish_1.fasta -o $sample.contigs.final.fasta -r $fq1
 
 
-### freebayes-parallele requires the package: parallele and vcflib, can be installed by conda, 
-### remember to edit the conda_env/bin/vcffirstheader with python2
-freebayes-parallel <(python $dir/fasta_generate_regions.py $sample.contigs.fasta.fai 100000) $threads -p 1 -f $sample.contigs.fasta $sample.contigs.bam >$sample.contigs.vcf
-# freebayes -f $sample.contigs.fasta -t $sample.solve.path.txt.ref.bed -p 1 $sample.contigs.bam >$sample.contigs.vcf
-bgzip -f $sample.contigs.vcf
-tabix -f $sample.contigs.vcf.gz
-svaba run -t $sample.contigs.bam -G $sample.contigs.fasta -a $sample.svaba_2_ -p $threads
-python $dir/polish_contigs.py $sample.contigs.vcf.gz $sample.svaba_2_.svaba.indel.vcf $sample.svaba_2_.svaba.sv.vcf $sample.contigs.fasta $sample.contigs.final.fasta
+# contig_file=$sample.contigs.polish_1.fasta
+# bam_file=$sample.contigs.2.bam
+# pileup_file=$sample.contigs.samtools.pileup
+# bwa index $contig_file
+# samtools faidx $contig_file
+# bwa mem -a -t $threads $contig_file $fq1 $fq2 | samtools view -h -q 10 -m 50 -F 4 -b | samtools sort > $bam_file
+# samtools mpileup -C 50 -A -f $contig_file $bam_file |  awk '$3 != "N"' > $pileup_file
+# metaMIC extract_feature --mlen 500 --bam $bam_file -c $contig_file -o $outdir --pileup $pileup_file -m single
+# metaMIC predict --mlen 500 -c $contig_file -o $outdir -m single --st 0.3 --slen 100 --nb 2  --at 0.3
+# cp $outdir/metaMIC_corrected_contigs.fa $sample.contigs.final.fasta
+
+# ### freebayes-parallele requires the package: parallele and vcflib, can be installed by conda, 
+# ### remember to edit the conda_env/bin/vcffirstheader with python2
+# freebayes-parallel <(python $dir/fasta_generate_regions.py $sample.contigs.fasta.fai 100000) $threads -p 1 -f $sample.contigs.fasta $sample.contigs.bam >$sample.contigs.vcf
+# # freebayes -f $sample.contigs.fasta -t $sample.solve.path.txt.ref.bed -p 1 $sample.contigs.bam >$sample.contigs.vcf
+# bgzip -f $sample.contigs.vcf
+# tabix -f $sample.contigs.vcf.gz
+# svaba run -t $sample.contigs.bam -G $sample.contigs.fasta -a $sample.svaba_2_ -p $threads
+# python $dir/polish_contigs.py $sample.contigs.vcf.gz $sample.svaba_2_.svaba.indel.vcf $sample.svaba_2_.svaba.sv.vcf $sample.contigs.fasta $sample.contigs.final.fasta
+
+
+
+
 end=$(date +%s)
 take=$(( end - start ))
 echo five Time taken to variants is ${take} seconds. # >> ${sample}.log
