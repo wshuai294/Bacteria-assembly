@@ -380,8 +380,8 @@ if __name__ == "__main__":
     print ("separate reference...")
     my_bkps = My_bkps()
     my_bkps.read_delly_vcf() # breakpoint by SV detection
-    my_bkps.read_additional_ins_pos() # find some ins breakpoints by clipped reads
-    my_bkps.depth_segmentation() # breakpoint found by depth
+    # my_bkps.read_additional_ins_pos() # find some ins breakpoints by clipped reads
+    # my_bkps.depth_segmentation() # breakpoint found by depth
     # my_bkps.add_IS_bkp() # breakpoint found by mapping ref to IS database
     # my_bkps.add_repeat_bkp() # breakpoint found by mapping ref to itself
     # my_bkps.all_pos["NZ_CP043539.1"].append(461018)

@@ -26,7 +26,7 @@ threads=10
 
 
 if [ ! -f "$sample.selected.ref.txt" ]; then
-    $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
+    $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 5
     highest=$(awk -F',' 'BEGIN { max = 0 } 
             { if($2>max) { max=$2; val=$1; second_col=$2 } } 
             END { print val "," second_col }' $sample.match_rate.csv)
@@ -41,7 +41,7 @@ ref=$(cat $sample.selected.ref.txt)
 echo "selected ref is $ref."
 fi
 
-:<<!
+# :<<!
 bwa index $ref
 samtools faidx $ref
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
@@ -118,7 +118,7 @@ echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.
 !
 
 # pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
-java -Xmx900G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
+java -Xmx8G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 1000000
 cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
 minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
 minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf
