@@ -133,11 +133,11 @@ class My_bkps():
                 if sv_len < min_sv_len:
                     continue
                 self.add_lumpy(chrom, pos)
-                print ("SV", chrom, pos)
+                print ("SV", chrom, pos, file = bkp)
                 if array[4] == "<DEL>" or array[4] == "<DUP>":
                     pos_end = pos + sv_len
                     self.add_lumpy(chrom, pos_end)
-                    print ("DEL/DUP", chrom, pos_end)
+                    print ("DEL/DUP", chrom, pos_end, file = bkp)
             
             else:
                 fir = re.search("\[(.*?)\[", array[4])
@@ -152,21 +152,23 @@ class My_bkps():
                 # print (array[4], chrom, pos, abs(pos2 - pos))
                 if chrom2 == chrom and abs(pos2 - pos) < min_sv_len:
                     continue
-                # else:
-                #     self.add_lumpy(chrom, pos)
+                else:
+                    self.add_lumpy(chrom, pos)
+                    print ("BND", chrom, pos, file = bkp)
 
     def read_additional_ins_pos(self): # scan reads, find clipped reads
         cluster_central = ins_bps(bam_file)
         # print ("###########", cluster_central)
         for central in cluster_central:
             self.add_lumpy(central[0], central[1])
-            # print ("cluster", central[0], central[1])
+            print ("Clip", central[0], central[1], file = bkp)
 
         with open(short_ins_pos, "r") as f:
             for line in f:
                 chrom, pos = line.strip().split("\t")
                 self.add_lumpy(chrom, int(pos))
                 # print ("short INS", chrom, int(pos))
+                print ("short-INS", chrom, pos, file = bkp)
 
     def add_lumpy(self, chrom, pos):
         if chrom in self.all_pos.keys():
@@ -327,7 +329,8 @@ class My_bkps():
                 self.all_pos[intes[0]] += [intes[1], intes[2]]
             else:
                 self.all_pos[intes[0]] = [intes[1], intes[2]]
-            # print ("Depth", intes[0], intes[1], intes[2])
+            print ("Depth", intes[0], intes[1], file = bkp)
+            print ("Depth", intes[0], intes[2], file = bkp)
         # for ref in self.all_pos:
         #     ref_pos_list = self.all_pos[ref]
 
@@ -360,11 +363,14 @@ if __name__ == "__main__":
     sample = sys.argv[8]
 
     bed_file = ref_file + ".bed"
+    bkp_file = sample + ".breakpoints.table.txt"
+
+    bkp = open(bkp_file, 'w')
 
 
     min_gap = 20
     MIN_SEG_LEN = 50  #50
-    MIN_SEG_LEN_NEW = 10000 # 10000
+    MIN_SEG_LEN_NEW = 100000 # 10000
     min_sv_len = MIN_SEG_LEN
     min_exist_len = MIN_SEG_LEN
     min_mapped_ratio = 0.8
@@ -381,3 +387,4 @@ if __name__ == "__main__":
     # my_bkps.all_pos["NZ_CP043539.1"].append(461018)
     my_bkps.cluster_pos()
     my_bkps.get_segments()
+    bkp.close()

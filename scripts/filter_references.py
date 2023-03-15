@@ -75,7 +75,7 @@ def count_IS_in_each_ref():
         if not os.path.isfile(ref_assembly):
             continue
         blast_file = ref_assembly + ".IS.blast"
-        # blast(ref_assembly, blast_file)
+        blast(ref_assembly, blast_file)
         if not os.path.isfile(blast_file):
             continue
         sorted_IS_dict = get_bkp(blast_file)
@@ -85,7 +85,7 @@ def count_IS_in_each_ref():
         # break
     sorted_assembly_dict = sorted(assembly_dict.items(), key=lambda item: item[1])
     # print (sorted_assembly_dict[:100])
-    for i in range(100):
+    for i in range(500):
         print (sorted_assembly_dict[i][0])
 
 # test = "/home/wangshuai/assembly_result/test.out"

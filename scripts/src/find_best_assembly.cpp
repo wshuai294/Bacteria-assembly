@@ -15,7 +15,8 @@
 #include <map>
 #include <mutex>
 #include <queue>
-
+#include <algorithm>
+#include <list>
 
 using namespace std;
 
@@ -29,7 +30,8 @@ unsigned char low_depth;
 int k;
 char *kmer_count_table;
 long array_size;
-float record_match_rate[100000]; // at most 100,000 assemblies
+// float record_match_rate[100000]; // at most 100,000 assemblies
+// vector(int ) record_match_rate(100000);
 
 int thread_num;
 std::mutex mtx;  
@@ -160,6 +162,42 @@ string get_read_ID(string reads_seq){
     return read_name_forward;
 }
 
+struct Continue_Result {
+    int N50;
+    int total_len;
+    float match_rate;
+    string genome;
+
+};
+Continue_Result record_match_rate[10000]; // save kmer hit status of each genome
+
+Continue_Result compute_N50(int* array, int size) {
+    // Sort the array in descending order
+    std::sort(array, array + size, std::greater<int>());
+    
+    // Calculate the total sum of the array
+    int total_sum = 0;
+    for (int i = 0; i < size; i++) {
+        total_sum += array[i];
+    }
+    
+    // Find the index n where the cumulative sum is greater than or equal to half of the total sum
+    int half_sum = total_sum / 2;
+    int cumulative_sum = 0;
+    int n = 0;
+    while (cumulative_sum < half_sum && n < size) {
+        cumulative_sum += array[n];
+        n++;
+    }
+    Continue_Result result;
+    // Compute the N50 value
+    int N50 = array[n-1];
+
+    result.N50 = N50;
+    result.total_len = total_sum;
+    
+    return result;
+}
 
 class Fasta{
     public:
@@ -200,15 +238,14 @@ string Fasta::get_ref_name(string fasta_file){
 
 class Select_ref{
     public:
-    
-    float get_fitness(string fasta_file, Encode encoder);
-    string check_each_genome(string genome_list_file, Encode encoder, string match_rate_file);
+    Continue_Result get_fitness(string fasta_file, Encode encoder);
+    // string check_each_genome(string genome_list_file, Encode encoder, string match_rate_file);
     void parallele_each_genome(string genome_list_file, Encode encoder, int start_g, int end_g);
     int assign_parallele(string genome_list_file);
     void output_match_rate(string genome_list_file, string match_rate_file);
 };
 
-float Select_ref::get_fitness(string fasta_file, Encode encoder){
+Continue_Result Select_ref::get_fitness(string fasta_file, Encode encoder){
     Fasta fasta;
     string ref_seq = fasta.get_ref_seq(fasta_file);
     double match_base_num = 0;
@@ -224,6 +261,10 @@ float Select_ref::get_fitness(string fasta_file, Encode encoder){
     int covert_num, comple_num;
     short convert_ref[300];
     short complemented_ref[300];
+
+    int continous_frag[6000];
+    int frag_index = 0;
+    int frag_len = 0;
 
     // cout <<"check fitness..."<<endl;
     ref_len= ref_seq.length();
@@ -268,41 +309,36 @@ float Select_ref::get_fitness(string fasta_file, Encode encoder){
         if (max_dp > low_depth){
             // cout <<"###" <<endl;
             match_base_num += 1;
+            frag_len += 1;
+        }
+        else{
+            if (frag_len > 500){
+                continous_frag[frag_index] = frag_len;
+                if (frag_index > 5990){
+                    cout << "Too many fragments for continous_frag!"<<endl;
+                }
+                frag_index += 1;
+            }
+            frag_len = 0;
         }
     }        
     delete [] ref_int;
     delete [] ref_comple_int;
-
+    
+    // for (int j = 0; j < frag_index; j++){
+    //     cout << j <<"\t" <<continous_frag[j] <<endl;
+    // }
+    Continue_Result result = compute_N50(continous_frag, frag_index);
+    
     float match_rate = match_base_num/ref_len;
+    result.match_rate = match_rate;
+    result.genome = fasta_file;
+    // cout << "N50:\t" << result.N50 << " total len:\t" << result.total_len<< " match rate:\t"<<result.match_rate << endl;
     // cout << "match rate is\t"<<match_rate<<endl;
-    return match_rate;
+    // return match_rate;
+    return result;
 }
 
-string Select_ref::check_each_genome(string genome_list_file, Encode encoder, string match_rate_file){
-    ifstream list_file;
-    list_file.open(genome_list_file, ios::in);
-
-    ofstream out_file;
-    out_file.open(match_rate_file, ios::out);
-
-    string each_genome, select_genome;
-    float match_rate;
-    float max_match_rate = 0;
-    while (getline(list_file, each_genome)){
-        match_rate = this-> get_fitness(each_genome, encoder);
-        cout << each_genome<<" match rate is "<<match_rate<<endl;
-        out_file << each_genome<<","<<match_rate<<endl;
-        if (match_rate >= max_match_rate){
-            max_match_rate = match_rate;
-            select_genome = each_genome;
-        }
-    }
-    cout << "select genome is "<<select_genome<<endl;
-    list_file.close();
-    out_file.close();
-
-    return select_genome;
-}
 
 int Select_ref::assign_parallele(string genome_list_file){
     ifstream list_file;
@@ -326,12 +362,15 @@ void Select_ref::parallele_each_genome(string genome_list_file, Encode encoder, 
     list_file.open(genome_list_file, ios::in);
 
     string each_genome;
-    float match_rate;
+    // float match_rate;
     int genome_index = 0;
     while (getline(list_file, each_genome)){
         if (genome_index >= start_g & genome_index < end_g){
-            match_rate = this-> get_fitness(each_genome, encoder);
-            record_match_rate[genome_index] = match_rate;
+            record_match_rate[genome_index] = this-> get_fitness(each_genome, encoder);
+            // cout << genome_index << " index " <<record_match_rate[genome_index].genome << " is " << record_match_rate[genome_index].match_rate << endl;
+        }
+        if (genome_index > 9998){
+            cout << "Too many genomes for record_match_rate!" << endl;
         }
         genome_index += 1;
     }
@@ -346,13 +385,13 @@ void Select_ref::output_match_rate(string genome_list_file, string match_rate_fi
     out_file.open(match_rate_file, ios::out);
     int genome_index = 0;
     string each_genome;
-
     while (getline(list_file, each_genome)){
-        float match_rate = record_match_rate[genome_index];
-        out_file << each_genome<<","<<match_rate<<endl;
+        // float match_rate = record_match_rate[genome_index];
+        Continue_Result result = record_match_rate[genome_index];
+        // cout << result.genome<<"\t"<< result.match_rate<<"\t"<<result.N50<<"\t"<< result.total_len<< endl;
+        out_file << result.genome<<","<< result.match_rate<<","<<result.N50<<","<< result.total_len <<endl;
         genome_index += 1;
     }
-
     list_file.close();
     out_file.close();
 
@@ -510,6 +549,8 @@ long file_size(string filename)
     return size;  
 }  
 
+
+
 int main( int argc, char *argv[])
 {
     unsigned seed;
@@ -582,6 +623,7 @@ int main( int argc, char *argv[])
     for (int i=0; i<thread_num; i++){
         start_g = i*each_thread_g_num;
         end_g = (i+1)*each_thread_g_num;
+        // cout << i << "\t" << start_g <<"\t" << end_g << endl;
         threads.push_back(thread(&Select_ref::parallele_each_genome, select, fasta_list, encoder, start_g, end_g));
     }
 	for (auto&th : threads)

@@ -9,6 +9,7 @@ fq1=$2
 fq2=$3
 ID=$4
 outdir=$5
+truth=$6
 
 sample=$outdir/$ID
 ins_ref=$outdir/$ID.ins.fa
@@ -23,15 +24,24 @@ mkdir $outdir
 map_qual=20
 threads=10
 
-# :<<!
-$dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
-highest=$(awk -F',' 'BEGIN { max = 0 } 
-         { if($2>max) { max=$2; val=$1; second_col=$2 } } 
-         END { print val "," second_col }' $sample.match_rate.csv)
-ref=$(echo $highest | awk -F',' '{print $1}')
-echo "selected ref is $highest."
 
+if [ ! -f "$sample.selected.ref.txt" ]; then
+    $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
+    highest=$(awk -F',' 'BEGIN { max = 0 } 
+            { if($2>max) { max=$2; val=$1; second_col=$2 } } 
+            END { print val "," second_col }' $sample.match_rate.csv)
+    # highest=$(awk -F',' 'BEGIN { max = 0 } 
+    #          { if($4>max) { max=$4; val=$1; second_col=$4 } } 
+    #          END { print val "," second_col }' $sample.match_rate.csv)
+    ref=$(echo $highest | awk -F',' '{print $1}')
+    echo "selected ref is $highest."
+    echo "$ref" >$sample.selected.ref.txt
+else
+ref=$(cat $sample.selected.ref.txt)
+echo "selected ref is $ref."
+fi
 
+:<<!
 bwa index $ref
 samtools faidx $ref
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
@@ -82,7 +92,7 @@ samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
-!
+# !
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
@@ -99,15 +109,22 @@ echo three Time taken to matching is ${take} seconds. # >> ${sample}.log
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
-  | samtools view -L $sample.solve.path.txt.ref.bed -bhS -> $sample.contigs.unsort.bam
+  | samtools view -F 260 -q 30  -bhS -> $sample.contigs.unsort.bam # -L $sample.solve.path.txt.ref.bed
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
 end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.log
-# !
-pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 
+!
+
+# pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
+java -Xmx900G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
 cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
+minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
+minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf
+
+minimap2 -c $truth $ref > $sample.paf
+minidot $sample.paf > $sample.eps && epstopdf $sample.eps -o $sample.truth.ref.pdf
 
 # python3 $dir/resolve_misassembly.py -i $sample.contigs.polish_1.fasta -o $sample.contigs.final.fasta -r $fq1
 

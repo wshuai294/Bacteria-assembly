@@ -75,8 +75,10 @@ class Sample():
     
     def run_quast(self):
         self.get_result()
-        command = f"~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir}"
-        # os.system(command)
+        command = f"~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir} --ambiguity-usage none"
+        if self.method == "Spades":
+            print (command)
+            # os.system(command)
         quast = Quast(self.quast_dir)
         self.NGA50 = quast.NGA50
         self.base_error = quast.base_error
@@ -110,7 +112,8 @@ class Benchmark():
         self.spades_dir = self.our_dir.replace("our", "spades")
         # self.our_dir = "/home/wangshuai/assembly_result/w3_test/"
         # self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli/"
-        self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli_new/"
+        # self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli_new/"
+        self.our_dir = "/home/wangshuai/assembly_result/w3_ecoli/"
         self.data = []
         
 
@@ -128,8 +131,8 @@ class Benchmark():
     
     def main(self):
         for ID in self.sample_list:
-            if ID == "VISLISI_33":
-                continue
+            # if ID == "104":
+            #     break
             print (ID)
             sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Our")
             self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Our", sample.misassemblies, sample.base_error])

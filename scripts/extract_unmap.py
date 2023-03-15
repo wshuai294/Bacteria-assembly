@@ -20,6 +20,9 @@ def main():
         # so set quality cutoff may bring some multi-aligned reads
         if read.is_unmapped : 
             filter_file.write(read)
+        # tags = read.get_tags()
+        # if 'XA' in tags:
+        #     filter_file.write(read)
 
         # if read.cigartuples: # chatGPT
         #     start = 0

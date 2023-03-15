@@ -17,9 +17,9 @@ class Simulation():
 
         self.depth = 50
         self.reads_len = 150
-        self.chosen_genome_num = 30
+        self.chosen_genome_num = 10
 
-        self.original_genome_list = "/mnt/d/breakpoints/assembly/simulation/ecoli/fna.list"
+        self.original_genome_list = "/mnt/d/breakpoints/assembly/sim/database/ecoli//fna.list"
         self.reference = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/ecoli_ref.fna"
         self.sim_dir = "/mnt/d/breakpoints/assembly/simulation/assembly_test/sim/"
         self.res_dir = "/home/wangshuai/assembly_result/ecoli/"
@@ -95,17 +95,18 @@ class Simulation():
             f = open(genome, 'r')
             # f = open(genome, encoding= 'unicode_escape')
             line = f.readline()
-            mat = re.search("strain (.*?) chromosome", line)
-            if mat:
-                ID= mat.group(1).strip()
-                ID = ID.replace("(", "_")
-                ID = ID.replace(")", "_")
-                ID = ID.replace("-", "_")
-                ID = ID.replace(" ", "_")
-                ID = ID.replace("/", "_")
-                f.close()
-                self.generate_fastq(ID, genome)
-                print (ID, genome, file = tru)
+            # mat = re.search("strain (.*?) chromosome", line)
+            # if mat:
+            #     ID= mat.group(1).strip()
+            #     ID = ID.replace("(", "_")
+            #     ID = ID.replace(")", "_")
+            #     ID = ID.replace("-", "_")
+            #     ID = ID.replace(" ", "_")
+            #     ID = ID.replace("/", "_")
+            #     f.close()
+            ID = line[1:].split()[0]
+            self.generate_fastq(ID, genome)
+            print (ID, genome, file = tru)
             # print (ID)
             f.close()
         tru.close()
