@@ -8,6 +8,10 @@ from sklearn.cluster import DBSCAN
 import os
 from pysam import VariantFile
 import re
+from Bio import SeqIO
+import vcf
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 from find_INS_breakpoints import ins_bps
 from get_IS_breakpoints import IS_bkp, get_repeat_bkp
@@ -124,6 +128,10 @@ class My_bkps():
             array = line.split()
             chrom = array[0]
             pos = int(array[1])
+            genotype = array[-1].split(":")[0]
+
+            if genotype == "0/0":
+                continue
 
             # if array[6] != "PASS":
             #     continue
@@ -227,7 +235,8 @@ class My_bkps():
                     self.segments.append([ref, start, self.ref_len[ref]])
         # print (self.segments)
         self.remove_unmapped_segs()
-        self.get_segments_fasta()
+        # self.get_segments_fasta()
+        self.handle_indel()
 
     def get_bed_file(self):
         intervals = ""
@@ -251,6 +260,88 @@ class My_bkps():
         order = f"samtools faidx {ref_file} {intervals}> {ref_seg_file}"
         # print (order)
         os.system(order)
+    
+    def read_indel(self, short_indel_vcf):
+        vcf = pysam.VariantFile(short_indel_vcf)
+        indel_dict = {}
+
+        for record in vcf.fetch():
+            ref = record.ref
+            alt = record.alts[0]
+
+            if len(ref) < len(alt):
+                ins_seq = alt[len(ref):]
+                if len(ins_seq) > 30:
+                    if record.chrom not in indel_dict:
+                        indel_dict[record.chrom] = []
+                    indel_dict[record.chrom].append([record.pos, ref, alt])
+        vcf.close()
+        return indel_dict
+
+    def delete_short(self):
+        f_short_segs = open(short_segs, 'w')
+        new_segs = []
+        for seg in self.segments:
+            # reads mapped to shorter segments will be assembled
+            if abs(seg[1]-seg[2]) > 0:#MIN_SEG_LEN_NEW:
+                new_segs.append(seg)
+                pass
+            else:
+                print (f"{seg[0]} {seg[1]} {seg[2]}", file = f_short_segs)
+        f_short_segs.close()
+        self.segments = new_segs
+
+    def load_segment_ref(self):
+        self.delete_short()
+        segment_dict = {}
+        locus_dict = {}
+        with open(ref_file, "r") as fasta_file:
+            for record in SeqIO.parse(fasta_file, "fasta"):
+                segment_dict[record.id] = {}
+                for seg in self.segments:
+                    if record.id  == seg[0]:
+                        seg_name = f"{record.id}:{seg[1]}-{seg[2]}"
+                        seg_record = SeqRecord(Seq(""), seg_name, '', '')
+                        seg_record.seq = Seq(record.seq[seg[1]-1 : seg[2]])
+                        segment_dict[record.id][seg_name] = seg_record
+                        locus_dict[seg_name] = seg
+        return segment_dict, locus_dict
+
+    def handle_indel(self):
+        segment_dict, locus_dict = self.load_segment_ref()
+        indel_dict = self.read_indel(short_indel_vcf)
+        new_dict = segment_dict.copy()
+        for chrom in indel_dict:
+            if chrom not in segment_dict:
+                continue
+            for indel in indel_dict[chrom]:
+                for seg_name in segment_dict[chrom]:
+                    segment_record = segment_dict[chrom][seg_name]
+                    seg = locus_dict[segment_record.id]
+                    if indel[0] >= seg[1] and indel[0] <= seg[2]:
+                        indel[0] = indel[0] - seg[1]
+
+                        if len(indel[1]) > len(indel[2]): # deletion
+                            start = len(segment_dict[chrom][segment_record.id].seq) - int(indel[0]) - 1
+                            end = start + len(indel[1]) - len(indel[2])
+                            start *= -1
+                            end *= -1
+                            new_dict[chrom][segment_record.id].seq = new_dict[chrom][segment_record.id].seq[:start] + new_dict[chrom][segment_record.id].seq[end:]
+                        
+                        elif len(indel[1]) < len(indel[2]):
+                            start = len(segment_dict[chrom][segment_record.id].seq) - int(indel[0]) - 1
+                            start *= -1
+                            new_dict[chrom][segment_record.id].seq = new_dict[chrom][segment_record.id].seq[:start] + str(indel[2]) + new_dict[chrom][segment_record.id].seq[start:]
+        self.output(new_dict, ref_seg_file)
+
+    def output(self, new_dict, consensus_file):
+        new_records = []
+        for chrom in new_dict:
+            for seg_name in new_dict[chrom]:
+                seg_record = new_dict[chrom][seg_name]
+                # print (seg_record)
+                new_records.append(seg_record)
+        SeqIO.write(new_records, consensus_file, "fasta")
 
     def remove_unmapped_segs(self):
         print ("remove unmapping")
@@ -361,6 +452,7 @@ if __name__ == "__main__":
     short_segs = sys.argv[6]
     short_ins_pos = sys.argv[7]
     sample = sys.argv[8]
+    short_indel_vcf = sys.argv[9]
 
     bed_file = ref_file + ".bed"
     bkp_file = sample + ".breakpoints.table.txt"

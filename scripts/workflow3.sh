@@ -26,7 +26,7 @@ threads=10
 
 
 if [ ! -f "$sample.selected.ref.txt" ]; then
-    $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 5
+    $dir/select_ref $fq1 $fq2 $ref_list 26 10 $threads $sample.match_rate.csv 30
     highest=$(awk -F',' 'BEGIN { max = 0 } 
             { if($2>max) { max=$2; val=$1; second_col=$2 } } 
             END { print val "," second_col }' $sample.match_rate.csv)
@@ -51,8 +51,9 @@ samtools index $sample.init.bam
 samtools depth $sample.init.bam >$sample.init.depth
 svaba run -t $sample.init.bam -G $ref -a $sample -p $threads
 python3 $dir/extract_short_insertions.py $sample.svaba.indel.vcf $sample.short.INS.fasta $sample.short.INS.pos.txt
-python3 $dir/ref_segment.py $ref $seg_ref $sample.svaba.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt $sample
-cat $sample.short.INS.fasta >>$seg_ref
+# !
+python3 $dir/ref_segment.py $ref $seg_ref $sample.svaba.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt $sample $sample.svaba.indel.vcf
+# cat $sample.short.INS.fasta >>$seg_ref
 
 end=$(date +%s)
 take=$(( end - start ))
@@ -67,7 +68,6 @@ if [ -d "$outdir/ass" ]; then
 fi
 echo "start spades..."
 spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz -o $outdir/ass --cov-cutoff 'auto' >$sample.spades.log
-echo "spades.py --isolate -t $threads --12 $sample.unmapped.s.fq.gz -o $outdir/ass --cov-cutoff 'auto' >$sample.spades.log"
 
 python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 1000 # original 100
 if [ -f "$outdir/ass/contigs.filter.fasta" ]; then
@@ -92,10 +92,11 @@ samtools index $sample.seg.bam
 samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
-# !
+
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
+# !
 # python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
 /home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
@@ -109,16 +110,16 @@ echo three Time taken to matching is ${take} seconds. # >> ${sample}.log
 bwa index $sample.contigs.fasta
 samtools faidx $sample.contigs.fasta
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
-  | samtools view -F 260 -q 30  -bhS -> $sample.contigs.unsort.bam # -L $sample.solve.path.txt.ref.bed
+  | samtools view -F 260 -q 20  -bhS -> $sample.contigs.unsort.bam
 samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
 samtools index $sample.contigs.bam
 end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.log
-!
 
+# !
 # pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
-java -Xmx8G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 1000000
+java -Xmx8G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --fix bases
 cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
 minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
 minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf

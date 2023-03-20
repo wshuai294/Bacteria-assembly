@@ -6,8 +6,8 @@ import os, re
 
 def download(species, raw_output):
     command = f"""
-    ncbi-genome-download --formats fasta --genera "{species}" bacteria --assembly-levels complete -o {raw_output}
-    gzip -d {raw_output}/refseq/bacteria/*/*fna.gz
+    ncbi-genome-download -r 10 --formats fasta --genera "{species}" bacteria --assembly-levels complete -o {raw_output}
+    gzip -f -d {raw_output}/refseq/bacteria/*/*fna.gz
     ls {raw_output}/refseq/bacteria/*/*fna >{raw_output}/fna.list
     """
     print (command)
@@ -35,13 +35,14 @@ def copy2database(raw_output, database_dir):
                         #print (line)
                         ID = line[1:].split()[0]
                     line_count += 1
-                if chr_count <= 5:
-                    shutil.copy2(file_path.strip(), f"{database_dir}/{ID}.fasta")
+                # if chr_count <= 5:
+                shutil.copy2(file_path.strip(), f"{database_dir}/{ID}.fasta")
     #            else:
     #               print("Skipping file: {}".format(file_path))
 
 if __name__ == "__main__":
-    species = "Serratia marcescens"
+    # species = "Serratia marcescens"
+    species = "Porphyromonas gingivalis"
     species_name = species.replace(" ", "_")
     print (species_name)
     raw_output = f"/mnt/d/breakpoints/downloads/{species_name}/"

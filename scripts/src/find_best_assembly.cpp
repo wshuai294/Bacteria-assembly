@@ -164,8 +164,10 @@ string get_read_ID(string reads_seq){
 
 struct Continue_Result {
     int N50;
-    int total_len;
+    int total_len; // total length of continuous segments
     float match_rate;
+    int match_len; // number of matcher kmer
+    int genome_len;
     string genome;
 
 };
@@ -211,10 +213,10 @@ string Fasta::get_ref_seq(string fasta_file){
     ifstream fa_file;
     fa_file.open(fasta_file, ios::in);
     // string line_seq;
-    
+    ref_seq = "\0";
     while (getline(fa_file,line_seq)){
         if (line_seq[0] == '>'){
-            ref_seq = "\0";
+            continue;
         }
         else{
             ref_seq += line_seq;           
@@ -333,6 +335,8 @@ Continue_Result Select_ref::get_fitness(string fasta_file, Encode encoder){
     float match_rate = match_base_num/ref_len;
     result.match_rate = match_rate;
     result.genome = fasta_file;
+    result.match_len = match_base_num;
+    result.genome_len = ref_len;
     // cout << "N50:\t" << result.N50 << " total len:\t" << result.total_len<< " match rate:\t"<<result.match_rate << endl;
     // cout << "match rate is\t"<<match_rate<<endl;
     // return match_rate;
@@ -389,7 +393,7 @@ void Select_ref::output_match_rate(string genome_list_file, string match_rate_fi
         // float match_rate = record_match_rate[genome_index];
         Continue_Result result = record_match_rate[genome_index];
         // cout << result.genome<<"\t"<< result.match_rate<<"\t"<<result.N50<<"\t"<< result.total_len<< endl;
-        out_file << result.genome<<","<< result.match_rate<<","<<result.N50<<","<< result.total_len <<endl;
+        out_file << result.genome<<","<< result.match_rate<<","<<result.N50<<","<< result.total_len<<","<<result.match_len<<","<<result.genome_len <<endl;
         genome_index += 1;
     }
     list_file.close();
