@@ -23,7 +23,7 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-$dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 30 $ID 70
+$dir/segmentation $fq1 $fq2 $ref_db 30 10 10 $outdir 30 $ID 70
 cat $outdir/$ID.map.fasta > $seg_ref
 
 python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
@@ -64,6 +64,42 @@ echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
 
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
+
+
+
+
+
+##### polish the cotigs
+bwa index $sample.contigs.fasta
+samtools faidx $sample.contigs.fasta
+bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $sample.contigs.fasta $fq1 $fq2 \
+  | samtools view -F 260 -q 20  -bhS -> $sample.contigs.unsort.bam
+samtools sort -o $sample.contigs.bam $sample.contigs.unsort.bam
+samtools index $sample.contigs.bam
+end=$(date +%s)
+take=$(( end - start ))
+echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.log
+
+# !
+# pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
+java -Xmx8G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --fix bases
+cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
+
+
+minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
+minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf
+
+minimap2 -c $truth $ref > $sample.paf
+minidot $sample.paf > $sample.eps && epstopdf $sample.eps -o $sample.truth.ref.pdf
+
+
+
+
+
+
+
+
+
 # bwa index $sample.contigs.fasta
 # samtools faidx $sample.contigs.fasta
 # # samtools dict -o $sample.contigs.dict $sample.contigs.fasta

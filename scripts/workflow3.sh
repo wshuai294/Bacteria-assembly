@@ -41,17 +41,25 @@ ref=$(cat $sample.selected.ref.txt)
 echo "selected ref is $ref."
 fi
 
+
 # :<<!
-bwa index $ref
+/home/wangshuai/softwares/SpecHLA/bin/novoindex $ref.ndx $ref
 samtools faidx $ref
-bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
-  | samtools view -bhS -> $sample.unsort.bam
-samtools sort -o $sample.init.bam $sample.unsort.bam
+/home/wangshuai/softwares/SpecHLA/bin/novoalign -d $ref.ndx -f $fq1 $fq2 -F STDFQ -o SAM \
+    -o FullNW --mCPU $threads | samtools view -Sb - | samtools sort -  > $sample.init.bam
+
+
+# bwa index $ref
+# samtools faidx $ref
+# bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \
+#   | samtools view -bhS -> $sample.unsort.bam
+# samtools sort -o $sample.init.bam $sample.unsort.bam
 samtools index $sample.init.bam
 samtools depth $sample.init.bam >$sample.init.depth
 svaba run -t $sample.init.bam -G $ref -a $sample -p $threads
 python3 $dir/extract_short_insertions.py $sample.svaba.indel.vcf $sample.short.INS.fasta $sample.short.INS.pos.txt
 # !
+# python3 $dir/ref_segment.py $ref $seg_ref $sample.svaba.unfiltered.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt $sample $sample.svaba.indel.vcf
 python3 $dir/ref_segment.py $ref $seg_ref $sample.svaba.sv.vcf $sample.init.depth $sample.init.bam $sample.short.segs.txt $sample.short.INS.pos.txt $sample $sample.svaba.indel.vcf
 # cat $sample.short.INS.fasta >>$seg_ref
 
@@ -62,7 +70,7 @@ echo one Time taken to segmentation is ${take} seconds. # >> ${sample}.log
 
 python3 $dir/extract_unmap.py $sample.init.bam $sample.unmap.bam $map_qual $sample.short.segs.txt
 samtools sort -o $sample.unmap.sort.bam $sample.unmap.bam
-samtools fastq -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --threads $threads $sample.unmap.sort.bam
+samtools fastq -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz $sample.unmap.sort.bam
 if [ -d "$outdir/ass" ]; then
   rm -r $outdir/ass
 fi
@@ -93,9 +101,20 @@ samtools depth -aa $sample.seg.bam >$sample.seg.bam.depth
 rm $sample.seg.unsort.bam
 
 
+
+
+
 echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
+# !
+# echo consider ref as long read
+# minimap2 -t $threads -a  $seg_ref $ref| samtools view -bhS -> $sample.ref.unsort.bam
+# samtools sort -o $sample.ref.bam $sample.ref.unsort.bam
+# samtools bam2fq $sample.ref.bam | seqtk seq -A > $sample.ref.fasta
+# python3 /home/wangshuai/softwares/hpvpipe/main.py process_tgs -l $sample.graph.txt -r $seg_ref -t $sample.ref.fasta -o $5
+
+
 # !
 # python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
 /home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c

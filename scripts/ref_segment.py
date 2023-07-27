@@ -121,8 +121,8 @@ class My_bkps():
                 continue
 
             # """
-            if re.search("IMPRECISE", line):
-                continue
+            # if re.search("IMPRECISE", line):
+            #     continue
             # len_r = re.search(";SVLEN=(.*?);", line)
             end_pos=re.search(";END=(.*?);", line)
             array = line.split()
@@ -188,9 +188,12 @@ class My_bkps():
         
         for ref in self.all_pos:
             ref_pos_list = self.all_pos[ref]
+            ref_pos_list = sorted(ref_pos_list)
             # print ("before cluster breakpoints:", ref, ref_pos_list)
             ref_rep_pos_list = self.dbscan_clu(ref_pos_list)
             self.all_pos[ref] = ref_rep_pos_list
+            for pos in ref_rep_pos_list:
+                print ("final", ref, pos, file = bkp)
             # print (self.all_pos)
             # print ("after cluster breakpoints:", ref, ref_rep_pos_list)
 
@@ -206,9 +209,6 @@ class My_bkps():
             if lab[i] not in cluster_label_dict:
                 ref_rep_pos_list.append(ref_pos_list[i])
                 cluster_label_dict[lab[i]] = 1
-
-        # print (ref_pos_list)
-        # print (ref_rep_pos_list)
 
         return sorted(ref_rep_pos_list)
 
@@ -318,6 +318,9 @@ class My_bkps():
                 for seg_name in segment_dict[chrom]:
                     segment_record = segment_dict[chrom][seg_name]
                     seg = locus_dict[segment_record.id]
+
+                    if abs( seg[2] - seg[1]) <= MIN_SEG_LEN_NEW:
+                        continue
                     if indel[0] >= seg[1] and indel[0] <= seg[2]:
                         indel[0] = indel[0] - seg[1]
 

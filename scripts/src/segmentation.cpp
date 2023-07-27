@@ -24,7 +24,7 @@ const short c = 300;
 const char coder_num = 3;
 const unsigned char least_depth = 127;
 const unsigned int window_size = 1000;
-const unsigned int window_min_hit = 980;
+const unsigned int window_min_hit = 999;
 
 unsigned char low_depth;
 int k;
@@ -172,39 +172,50 @@ string get_read_ID(string reads_seq){
 class Fasta{
     public:
     string ref_seq;
-    string line_seq, chr_name;
-    string get_ref_seq(string fasta_file);
-    string get_ref_name(string fasta_file);
+    string line_seq, ref_name;
+    void get_ref_seq(string fasta_file);
+    // string get_ref_name(string fasta_file);
 };
 
-string Fasta::get_ref_seq(string fasta_file){
+void Fasta::get_ref_seq(string fasta_file){
     ifstream fa_file;
     fa_file.open(fasta_file, ios::in);
     // string line_seq;
+
+    ref_name = "undefined";
     
     while (getline(fa_file,line_seq)){
         if (line_seq[0] == '>'){
-            ref_seq = "\0";
+            if (ref_name == "undefined"){
+                ref_seq = "\0";
+                ref_name = get_read_ID(line_seq).substr(1); 
+            }
+            else{
+                break;  // only consider one contig
+            }
+            
         }
         else{
             ref_seq += line_seq;           
         }            
     }
-    return ref_seq;
+    fa_file.close();
+    // return ref_seq;
 }
 
-string Fasta::get_ref_name(string fasta_file){
-    ifstream fa_file;
-    fa_file.open(fasta_file, ios::in);
+// string Fasta::get_ref_name(string fasta_file){
+//     ifstream fa_file;
+//     fa_file.open(fasta_file, ios::in);
     
-    while (getline(fa_file,line_seq)){
-        if (line_seq[0] == '>'){
-            chr_name = get_read_ID(line_seq).substr(1);   
-            break; 
-        }
-    }
-    return chr_name;
-}
+//     while (getline(fa_file,line_seq)){
+//         if (line_seq[0] == '>'){
+//             chr_name = get_read_ID(line_seq).substr(1);   
+//             break; 
+//         }
+//     }
+//     fa_file.close();
+//     return chr_name;
+// }
 
 class Unmap{
     public:
@@ -219,6 +230,7 @@ class Unmap{
 };
 
 void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
+    cout << "ref len is: \t"<<ref_len<<endl; 
     int start = 0;
     int end = 0;
     int good_base_num = 0; // in a windows
@@ -244,15 +256,15 @@ void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
             record_each_base.push(each_base);
         }
         end += 1;
-        // cout << j <<"\t" <<good_base_num<<endl; 
+        // cout << j <<"\t" <<good_base_num<<"\t"<<ref_len<<endl; 
         if (good_base_num >= window_min_hit){
             if (good_flag == false){
                 start = end + 1 - window_size;
                 if (start < 0){
                     start = 1;
-                }
-                good_flag = true;
+                }  
             } 
+            good_flag = true;
         }
         else{
             if (good_flag == true){
@@ -286,6 +298,7 @@ void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
             save_map_index += 1;  
         }
     }
+    cout <<"\n mapped segment num is \t" <<save_map_index << "\t"<<window_min_hit <<endl;
     delete []kmer_hit_array;
 }
 
@@ -430,7 +443,7 @@ class Select_ref{
 
 float Select_ref::get_fitness(string fasta_file, Encode encoder){
     Fasta fasta;
-    string ref_seq = fasta.get_ref_seq(fasta_file);
+    fasta.get_ref_seq(fasta_file);
     double match_base_num = 0;
 
     int ref_len;
@@ -446,14 +459,14 @@ float Select_ref::get_fitness(string fasta_file, Encode encoder){
     short complemented_ref[300];
 
     // cout <<"check fitness..."<<endl;
-    ref_len= ref_seq.length();
+    ref_len= fasta.ref_seq.length();
     // cout <<"genome len is "<<ref_len<<endl;
  
 
     int *ref_int = new int[ref_len];
     int *ref_comple_int = new int[ref_len];
     for (int j = 0; j < ref_len; j++){
-        ref_int[j] = (int)ref_seq[j];
+        ref_int[j] = (int)fasta.ref_seq[j];
         ref_comple_int[j] = encoder.comple[ref_int[j]];
     }
     for (int j = 0; j < ref_len-encoder.k+1; j++){
@@ -510,7 +523,7 @@ string Select_ref::check_each_genome(string genome_list_file, Encode encoder, st
     float max_match_rate = 0;
     while (getline(list_file, each_genome)){
         match_rate = this-> get_fitness(each_genome, encoder);
-        // cout << each_genome<<" match rate is "<<match_rate<<endl;
+        cout << each_genome<<" match rate is "<<match_rate<<endl;
         out_file << each_genome<<","<<match_rate<<endl;
         if (match_rate >= max_match_rate){
             max_match_rate = match_rate;
@@ -913,18 +926,19 @@ int main( int argc, char *argv[])
     cout << "reads are reloaded. "<< now4 - now3<<endl;
 
     Fasta fasta;
-    string ref_seq = fasta.get_ref_seq(select_genome);
-    string ref_name = fasta.get_ref_name(select_genome);
-    int ref_len = ref_seq.length();
-    char* kmer_hit_array = read_ref(ref_seq, encoder);
+    fasta.get_ref_seq(select_genome);
+    // string ref_name = fasta.get_ref_name(select_genome);
+    int ref_len = fasta.ref_seq.length();
+    cout << "ref\t" << fasta.ref_name << "\tlen:\t" << ref_len << "\t" << select_genome <<endl;
+    char* kmer_hit_array = read_ref(fasta.ref_seq, encoder);
     delete [] kmer_count_table;
     
 
     Unmap unmap;
     unmap.get_unmap(kmer_hit_array, ref_len);
     map_kmer_table = new char[array_size];
-    unmap.get_map_kmer(encoder, ref_seq);
-    unmap.output_map_segments(select_genome, ref_seq, outdir, ID, ref_name);
+    unmap.get_map_kmer(encoder, fasta.ref_seq);
+    unmap.output_map_segments(select_genome, fasta.ref_seq, outdir, ID, fasta.ref_name);
     time_t now5 = time(0);
     cout << "Getting map interval is done. "<< now5 - now4 << endl;
 

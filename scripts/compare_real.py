@@ -87,10 +87,13 @@ class Sample():
     
     def run_quast(self):
         self.get_result()
-        command = f"~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir}"
-        if self.method == "Ref":
-            print (command)
-            os.system(command)
+        command = f"~/softwares/quast-5.2.0/quast.py {self.result_fasta} -r {self.true_fasta} -o {self.quast_dir} --strict-NA"
+        # if self.method == "Ref":
+        #     # print (command)
+        #     os.system(command)
+        # if self.method == "Spades":
+        #     # print (command)
+        #     os.system(command)
         quast = Quast(self.quast_dir)
         self.NGA50 = quast.NGA50
         self.base_error = quast.base_error
@@ -144,14 +147,15 @@ class Benchmark():
             print (ID)
             sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Our")
             self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Our", sample.misassemblies, sample.base_error])
-            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Ref")
-            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Ref", sample.misassemblies, sample.base_error])
+            # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Ref")
+            # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Ref", sample.misassemblies, sample.base_error])
             sample = Sample(ID, self.spades_dir + "/" + ID, self.true_fasta_dict[ID], "Spades")
             self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Spades", sample.misassemblies, sample.base_error])
             # break
 
         self.df=pd.DataFrame(self.data, columns=['ID', 'NGA50','CPU_Time', 'Peak_RAM', 'Methods', "Misassemblies", "Base_Error(/100k)"])
         self.make_figures()
+        self.make_figures_test()
 
     def make_figures(self):
 
@@ -187,6 +191,46 @@ class Benchmark():
         # plt.xticks(rotation=30)
         plt.savefig('/home/wangshuai/assembly_result/figures/assembly_comparison_%s.pdf'%(give_time))
 
+    def make_figures_test(self):
+
+        genome_dict = {}
+        for d in self.data:
+            if d[0] not in genome_dict:
+                genome_dict[d[0]] = 1
+        genome_list = list(genome_dict.keys())
+        first = genome_list[:5]
+        data1 = []
+        data2 = []
+        for d in self.data:
+            d[1] = round(d[1]/1000)
+            if d[0] in first:
+                data1.append(d)
+            else:
+                data2.append(d)
+        df1=pd.DataFrame(data1, columns=['ID', 'NGA50','CPU_Time', 'Peak_RAM', 'Methods', "Misassemblies", "Base_Error(/100k)"])
+        df2=pd.DataFrame(data2, columns=['ID', 'NGA50','CPU_Time', 'Peak_RAM', 'Methods', "Misassemblies", "Base_Error(/100k)"])
+
+        fig, axes = plt.subplots(2, 2, gridspec_kw={'width_ratios': [5, 1]}, figsize=(15,9))
+        sns.barplot(ax = axes[0][0], x="ID",y='NGA50',hue= 'Methods',data=df1, log=False)
+        
+        sns.barplot(ax = axes[1][0], x="ID",y='NGA50',hue= 'Methods',data=df2, log=False)
+        sns.boxplot(ax = axes[0][1], x="Methods",y='NGA50',data=df1, showfliers =False, showmeans=False,meanprops={"marker":"o",
+                       "markerfacecolor":"white", 
+                       "markeredgecolor":"black",
+                      "markersize":"10"})
+        sns.boxplot(ax = axes[1][1], x="Methods",y='NGA50',data=df2, showfliers =False, showmeans=False,meanprops={"marker":"o",
+                       "markerfacecolor":"white", 
+                       "markeredgecolor":"black",
+                      "markersize":"10"})
+        # sns.catplot(ax = axes[0][0],x="ID",y='NGA50',hue= 'Methods',data=self.df, log=True)
+        give_time = datetime.now().strftime("%Y_%m_%d_%H_%M")
+        # plt.xticks(rotation=30)
+        axes[0][0].set_ylabel('NGA50(kbp)')
+        axes[0][1].set_ylabel('NGA50(kbp)')
+        axes[1][0].set_ylabel('NGA50(kbp)')
+        axes[1][1].set_ylabel('NGA50(kbp)')
+        plt.savefig('/home/wangshuai/assembly_result/figures/proposal_%s.pdf'%(give_time))
+
     def compar_ave(self):
         # self.df.groupby(['Methods'])['N50'].mean()
         mean_df = self.df.groupby(['Methods'])['NGA50'].mean().reset_index()
@@ -218,6 +262,9 @@ class Quast():
                 continue
             if array[0] == "#" and len(array) == 3 and array[1] == "misassemblies":
                 self.misassemblies = int(array[2])
+            elif array[0] == "#" and len(array) == 4 and array[2] == "misassemblies": # local assemblies
+                # print ("# local misassemblies", self.misassemblies)
+                self.misassemblies += int(array[3])
             elif array[0] == 'NGA50':
                 # print (array)
                 self.NGA50 = int(array[1])

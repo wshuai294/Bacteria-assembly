@@ -198,8 +198,6 @@ class Quast():
         self.base_error = None
         self.misassemblies = None
         self.read_report()
-
-        # 
     
     def read_report(self):
         f = open(self.result_txt, "r")
@@ -221,6 +219,7 @@ class Quast():
         self.base_error = self.mismatch_rate + self.indel_rate
 
 if __name__ == "__main__":
+    
     run_script = "/mnt/d/breakpoints/assembly/sim/run.sh"
     # run_script = "/mnt/d/breakpoints/assembly/sim/sim_s_lugdunensis/run.sh"
     ben = Benchmark(run_script)
