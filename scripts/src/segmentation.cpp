@@ -16,6 +16,7 @@
 #include <mutex>
 #include <queue>
 #include <list>
+#include <algorithm>
 
 
 using namespace std;
@@ -28,10 +29,10 @@ const unsigned int window_min_hit = 999;
 
 unsigned char low_depth;
 int k;
-char *kmer_count_table;
-char *map_kmer_table; // all kmers of mapped region
+unsigned char *kmer_count_table;
+unsigned char *map_kmer_table; // all kmers of mapped region
 long array_size;
-int least_read_kmer_num;
+float least_read_kmer_ratio;
 // vector<string> record_read_mapping_list;
 
 // const unsigned char low_depth = 10;
@@ -169,6 +170,66 @@ string get_read_ID(string reads_seq){
 }
 
 
+double findMedian(char *arr) {
+    int n = sizeof(arr) / sizeof(arr[0]);
+    // Sort the array in ascending order
+    sort(arr, arr + n);
+
+    // If the array has odd length, return the middle element
+    if (n % 2 == 1) {
+        return arr[n / 2];
+    }
+    // If the array has even length, return the average of the two middle elements
+    else {
+        return (arr[n / 2 - 1] + arr[n / 2]) / 2.0;
+    }
+}
+
+long get_fq_start(ifstream& fq_file, long start){ // find the read name line of a fastq file
+    long pos = 0;
+    bool flag = false;
+    bool done = false;
+    int x = 0;
+    for (long i = start; i>0; i--){
+
+        for (long j = i; j < i + 1000; j ++){
+            fq_file.seekg(j, ios::beg);
+            char chr1, chr2;
+            fq_file.get(chr1);
+            fq_file.get(chr2);
+
+            if (chr1 == '\n' and chr2 == '+'){ //third field
+                flag = true;
+                x = 0;
+            }  
+            if (flag) {
+                if (chr1 == '\n'){
+                    x += 1;
+                }
+                if (chr1 == '\n' and chr2 == '@' and x == 3){
+                    pos = j + 1;
+                    done = true;
+                    break;
+                }
+            }  
+            else{
+                if (chr1 == '\n'){
+                    x += 1;
+                }
+            }
+            if (x == 3){
+                break;
+            } 
+        }
+        cout <<  i << "\t" << pos <<endl; 
+        if (done){
+            break;
+        }
+    }
+    return pos;
+}
+
+
 class Fasta{
     public:
     string ref_seq;
@@ -203,23 +264,9 @@ void Fasta::get_ref_seq(string fasta_file){
     // return ref_seq;
 }
 
-// string Fasta::get_ref_name(string fasta_file){
-//     ifstream fa_file;
-//     fa_file.open(fasta_file, ios::in);
-    
-//     while (getline(fa_file,line_seq)){
-//         if (line_seq[0] == '>'){
-//             chr_name = get_read_ID(line_seq).substr(1);   
-//             break; 
-//         }
-//     }
-//     fa_file.close();
-//     return chr_name;
-// }
-
 class Unmap{
     public:
-        int save_map_region[1000]; // save segment intervals [start end start end ...]
+        int save_map_region[10000]; // save segment intervals [start end start end ...]
         int save_map_index = 0;
         // char *map_kmer_table = new char[array_size];
         string ref_seq;
@@ -229,8 +276,12 @@ class Unmap{
 
 };
 
+/*
 void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
     cout << "ref len is: \t"<<ref_len<<endl; 
+    double median_count = findMedian(kmer_hit_array);
+    cout <<"Median kmer count in ref is:\t" << median_count <<endl; 
+
     int start = 0;
     int end = 0;
     int good_base_num = 0; // in a windows
@@ -299,6 +350,116 @@ void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
         }
     }
     cout <<"\n mapped segment num is \t" <<save_map_index << "\t"<<window_min_hit <<endl;
+    delete []kmer_hit_array;
+}
+*/
+
+
+void Unmap::get_unmap(char* kmer_hit_array, int ref_len){
+    cout << "ref len is: \t"<<ref_len<<endl; 
+    double median_count = findMedian(kmer_hit_array);
+    double depth_cutoff = 1.9 * median_count;
+    cout <<"Median kmer count in ref is:\t" << median_count <<endl; 
+    
+    int start = 0;
+    int end = 0;
+    int good_base_num = 0; // in a windows
+    int window_depth_sum = 0; 
+    bool good_flag = false;
+    bool depth_flag = false;
+    int each_base = 0;
+    int small_window = 200;
+    // short record_each_base[window_size];
+    queue<int>record_each_base;
+    queue<int>record_each_depth;
+    for (int j = 0; j < ref_len; j++){
+        if (kmer_hit_array[j] >= low_depth){
+            each_base = 1;
+        }
+        else{
+            each_base = 0;
+        }
+
+        if (j < window_size){
+            record_each_base.push(each_base);
+            good_base_num += each_base;
+        }
+        else{
+            good_base_num = good_base_num - record_each_base.front() + each_base;
+            record_each_base.pop();
+            record_each_base.push(each_base);
+        }
+
+        if (j < small_window){
+            record_each_depth.push(kmer_hit_array[j]);
+            window_depth_sum += kmer_hit_array[j];
+        }
+        else{
+            window_depth_sum = window_depth_sum - record_each_depth.front() + kmer_hit_array[j];
+            record_each_depth.pop();
+            record_each_depth.push(kmer_hit_array[j]);
+        }
+
+        double window_depth = window_depth_sum / small_window;
+
+        // if (window_depth > 100 ){
+        //     cout << j << "\t" << window_depth <<endl;
+        // }
+
+        depth_flag = true;
+        if (window_depth < depth_cutoff){
+            depth_flag = true;
+        }
+        else{
+            depth_flag = false;
+        }
+        
+        // cout << window_depth <<"\t" <<depth_flag<<"\t"<<depth_cutoff<<endl; 
+            
+        end += 1;
+        // cout << j <<"\t" <<good_base_num<<"\t"<<ref_len<<endl; 
+        if (good_base_num >= window_min_hit && depth_flag){
+            if (good_flag == false){
+                start = end + 1 - window_size;
+                if (start < 0){
+                    start = 1;
+                }  
+            } 
+            good_flag = true;
+        }
+        else{
+            if (good_flag == true){
+                // cout << start <<"\t" <<end<<endl;
+                if (save_map_index == 0){
+                    save_map_region[save_map_index*2] = start;
+                    save_map_region[save_map_index*2+1] = end; 
+                    save_map_index += 1;
+                }
+                else{
+                    if (start < save_map_region[save_map_index*2-1]){
+                        save_map_region[save_map_index*2-1] = end;
+                    }
+                    else{
+                        save_map_region[save_map_index*2] = start;
+                        save_map_region[save_map_index*2+1] = end; 
+                        save_map_index += 1;
+                    }  
+                }
+            }
+            good_flag = false;
+        }
+    }
+    if (good_flag == true){
+        if (start < save_map_region[save_map_index*2-1]){
+            save_map_region[save_map_index*2-1] = end;
+        }
+        else{
+            save_map_region[save_map_index*2] = start;
+            save_map_region[save_map_index*2+1] = end; 
+            save_map_index += 1;  
+        }
+    }
+    cout <<"\n mapped segment num is \t" <<save_map_index << "\twindow_min_hit:\t"<<window_min_hit <<endl;
     delete []kmer_hit_array;
 }
 
@@ -397,6 +558,7 @@ char* read_ref(string ref_seq, Encode encoder)
     // index_file.write((char *)(&ref_len), sizeof(unsigned int));
     for (int j = 0; j < ref_len-encoder.k+1; j++){
         int max_dp = 0;
+        // int min_dp = 0;
         for (int i = 0; i < 3; i++){
             kmer_index = 0;
             comple_kmer_index = 0;
@@ -423,14 +585,24 @@ char* read_ref(string ref_seq, Encode encoder)
             if (max_dp < dp){
                 max_dp = dp;
             }
+
+            // if (i == 0){
+            //     min_dp = dp;
+            // }
+            // else{
+            //     if (dp < min_dp){
+            //         min_dp = dp;
+            //     }
+            // }
             // cout <<j<<"\t"<< i<<"\t"<<dp<<"\t" <<endl;
             // index_file.write((char *)(&real_index), sizeof(real_index));  
         }
-        kmer_hit_array[j] = max_dp; 
+        // kmer_hit_array[j] = min_dp; //max_dp; 
+        kmer_hit_array[j] = max_dp;
     }        
     delete [] ref_int;
     delete [] ref_comple_int;
-    
+
     time_t t1 = time(0);
     return kmer_hit_array;
 }
@@ -543,16 +715,17 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long star
     ifstream fq_file; 
     fq_file.open(fastq_file);
 
-    long pos = 0;
-    for (long i = start; i>0; i--){
-        fq_file.seekg(i, ios::beg);
-        char j;
-        fq_file.get(j);
-        if (j == '@'){ //only read name has this symbol.
-            pos = i;
-            break;
-        }       
-    }
+    // long pos = 0;
+    // for (long i = start; i>0; i--){
+    //     fq_file.seekg(i, ios::beg);
+    //     char j;
+    //     fq_file.get(j);
+    //     if (j == '@'){ //only read name has this symbol.
+    //         pos = i;
+    //         break;
+    //     }       
+    // }
+    long pos = get_fq_start(fq_file, start);
     fq_file.seekg(pos, ios::beg);
     long add_size = start;
 
@@ -633,25 +806,33 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long star
     // return kmer_count_table;
 }
 
-void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long start, long end)
+
+void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long start, long end, string prefix)
 {
     time_t t0 = time(0);
     ifstream fq_file; 
     fq_file.open(fastq_file);
 
     ofstream unmap_fq_file;
-    unmap_fq_file.open(fastq_file+ "_part_" + to_string(start)+".txt", ios::out);
+    string unmap_file = prefix + "_part_" + to_string(start)+".txt";
+    unmap_fq_file.open(unmap_file, ios::out);
+    cout << unmap_file << endl;
 
-    long pos = 0;
-    for (long i = start; i>0; i--){
-        fq_file.seekg(i, ios::beg);
-        char j;
-        fq_file.get(j);
-        if (j == '@'){ //only read name has this symbol.
-            pos = i;
-            break;
-        }       
-    }
+    // long pos = 0;
+    // for (long i = start; i>0; i--){
+    //     fq_file.seekg(i, ios::beg);
+    //     char chr1, chr2, chr3;
+    //     fq_file.get(chr1);
+    //     fq_file.get(chr2);
+    //     fq_file.get(chr3);
+
+    //     if (chr1 != '+' and chr2 == '\n' and chr3 == '@'){ //only read name has this symbol at the front.
+    //         pos = i + 2;
+    //         break;
+    //     }       
+    // }
+    long pos = get_fq_start(fq_file, start);
+
     fq_file.seekg(pos, ios::beg);
     long add_size = start;
 
@@ -711,7 +892,7 @@ void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long
                         if (all_valid == false){
                             real_index = 0;
                         }
-                        if ((int)map_kmer_table[real_index] > 0 & all_valid == true ){
+                        if ((int)map_kmer_table[real_index] > 0 and all_valid == true ){
                             hit_flag = true;
                         }  
                     }
@@ -719,23 +900,28 @@ void get_unmap_fastq(string fastq_file, Encode encoder, int down_sam_ratio, long
                         hit_kmer_num += 1;
                     }
                 }
-                if (hit_kmer_num < least_read_kmer_num){ // determine if a read is unmap 
+                int cutoff = least_read_kmer_ratio * (read_len - k + 1);
+                if ( hit_kmer_num < cutoff ){ // determine if a read is unmap 
                     unmap_flag = true;
                 }
-                // cout <<lines <<" "<<hit_kmer_num<<endl;
-                
+                else {
+                    unmap_flag = false;
+                }
+                // cout << lines << " " << hit_kmer_num << " " << unmap_flag << " " << cutoff << endl;  
             }         
         }
-        else{
-            if (lines % 4 == 0){
-                unmap_flag = false;
-                read_index += 1;
-                read_name = get_read_ID(reads_seq).substr(1);
+
+        if (lines % 4 == 0){
+            unmap_flag = false;
+            read_index += 1;
+            read_name = get_read_ID(reads_seq).substr(1);
+        }
+      
+        if (lines % 4 == 3){
+            // cout << unmap_flag<< "\tread_name\t" << read_name << "\t" << endl;
+            if (unmap_flag){
+                unmap_fq_file << read_name << endl;
             }
-        }        
-        if (lines % 4 == 3 & unmap_flag){
-            // cout << read_name << endl;
-            unmap_fq_file << read_name << endl;
         }
         lines++;
     }
@@ -847,11 +1033,12 @@ int main( int argc, char *argv[])
     thread_num = stod(argv[6]);
     string outdir = argv[7]; // 
     array_size = pow(2, k);
-    kmer_count_table = new char[array_size];
+    kmer_count_table = new unsigned char[array_size];
     int down_sam_ratio = stod(argv[8]); // percentage (0-100), randomly select reads with this probability, 30
     string ID = argv[9]; // sample ID
-    least_read_kmer_num = stod(argv[10]); // kmer num less than this will be regarded as unmapped
+    least_read_kmer_ratio = stod(argv[10]); // kmer num less than this will be regarded as unmapped
     string match_rate_file = outdir + "/" + ID + ".match_rate.csv"; //output file, the match rate of each fasta
+    string prefix = outdir + "/" + ID ;
 
     
     Encode encoder;
@@ -933,17 +1120,14 @@ int main( int argc, char *argv[])
     char* kmer_hit_array = read_ref(fasta.ref_seq, encoder);
     delete [] kmer_count_table;
     
-
     Unmap unmap;
     unmap.get_unmap(kmer_hit_array, ref_len);
-    map_kmer_table = new char[array_size];
+    map_kmer_table = new unsigned char[array_size];
     unmap.get_map_kmer(encoder, fasta.ref_seq);
     unmap.output_map_segments(select_genome, fasta.ref_seq, outdir, ID, fasta.ref_name);
     time_t now5 = time(0);
     cout << "Getting map interval is done. "<< now5 - now4 << endl;
 
-
-   
     down_sam_ratio = 100;
     for (int i=0; i<thread_num; i++){
         start = i*each_size;
@@ -951,7 +1135,7 @@ int main( int argc, char *argv[])
         if (i == thread_num-1){
             end = size;
         }
-        threads.push_back(thread(get_unmap_fastq, fq1, encoder, down_sam_ratio, start, end));
+        threads.push_back(thread(get_unmap_fastq, fq1, encoder, down_sam_ratio, start, end, prefix));
     }
 	for (auto&th : threads)
 		th.join();
@@ -963,7 +1147,7 @@ int main( int argc, char *argv[])
         if (i == thread_num-1){
             end = size;
         }
-        threads.push_back(thread(get_unmap_fastq, fq2, encoder, down_sam_ratio, start, end));
+        threads.push_back(thread(get_unmap_fastq, fq2, encoder, down_sam_ratio, start, end, prefix));
     }
 	for (auto&th : threads)
 		th.join();

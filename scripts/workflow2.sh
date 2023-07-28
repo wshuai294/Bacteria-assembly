@@ -8,7 +8,7 @@ fq1=$2
 fq2=$3
 ID=$4
 outdir=$5
-true=$6
+truth=$6
 
 sample=$outdir/$ID
 ins_ref=$outdir/$ID.ins.fa
@@ -23,16 +23,18 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-$dir/segmentation $fq1 $fq2 $ref_db 30 10 10 $outdir 30 $ID 70
+$dir/segmentation $fq1 $fq2 $ref_db 28 10 10 $outdir 30 $ID 0.2
 cat $outdir/$ID.map.fasta > $seg_ref
 
+echo "python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID"
 python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
 gzip -f $sample.unmapped.*fq
 
 # :<<!
 rm -r $outdir/ass
 echo "start spades..."
-spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --isolate -o $outdir/ass >$sample.spades.log
+echo "spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz  --isolate -o $outdir/ass >$sample.spades.log"  # -s $sample.unmapped.s.fq.gz
+spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz  --isolate -o $outdir/ass >$sample.spades.log  # -s $sample.unmapped.s.fq.gz
 python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100
 cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
@@ -55,19 +57,14 @@ echo graph-building...
 python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.depth
 # :<<!
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
-echo "matching is done..."
-/home/wangshuai/softwares/seqGraph/build/matching -b --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
-
+echo "matching..."
+# /home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
+python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
 end=$(date +%s)
 take=$(( end - start ))
 echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
-
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
-
-
-
-
 
 ##### polish the cotigs
 bwa index $sample.contigs.fasta
