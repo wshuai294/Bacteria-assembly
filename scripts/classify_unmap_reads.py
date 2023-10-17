@@ -15,8 +15,8 @@ ID = sys.argv[4]
 prefix = outdir + "/" + ID
 
 
-unmap_reads_file_fq1 = f"{prefix}.unmap.reads.txt"
-unmap_reads_file_fq2 = f"{prefix}.unmap.reads.txt"
+unmap_reads_file_fq1 = f"{prefix}_fq1.unmap.reads.txt"
+unmap_reads_file_fq2 = f"{prefix}_fq2.unmap.reads.txt"
 
 fq1 = prefix + ".unmapped.1.fq"
 fq2 = prefix + ".unmapped.2.fq"
@@ -25,12 +25,12 @@ fqs = prefix + ".unmapped.s.fq"
 def combine_frag():
     # the c++ script genetates _part_ files for each thread
     # combine them and delete temp files.
-    cmd = f"""cat {prefix}_part_*.txt >{unmap_reads_file_fq1}
-            #rm {prefix}_part_*.txt"""
+    cmd = f"""cat {prefix}_fq1_part_*.txt >{unmap_reads_file_fq1}
+            #rm {prefix}_fq1_part_*.txt"""
     os.system(cmd)
 
-    cmd = f"""cat {prefix}_part_*.txt >{unmap_reads_file_fq2}
-            #rm {prefix}_part_*.txt"""
+    cmd = f"""cat {prefix}_fq2_part_*.txt >{unmap_reads_file_fq2}
+            #rm {prefix}_fq2_part_*.txt"""
     os.system(cmd)
 
 
@@ -68,6 +68,7 @@ def extract_single_reads(focus_read_name_dict, other_read_name_dict, raw_fastq, 
 
 def main():
     combine_frag()
+    # print (unmap_reads_file_fq1)
     fq1_read_name_dict = extract_read_name(unmap_reads_file_fq1)
     # print (fq1_read_name_dict)
     fq2_read_name_dict = extract_read_name(unmap_reads_file_fq2)

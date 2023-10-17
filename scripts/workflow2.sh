@@ -23,24 +23,44 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-$dir/segmentation $fq1 $fq2 $ref_db 28 10 10 $outdir 30 $ID 0.2
-cat $outdir/$ID.map.fasta > $seg_ref
-
-echo "python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID"
-python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
-gzip -f $sample.unmapped.*fq
 
 # :<<!
+$dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 60 $ID 0.8  ## 0.95 is a normal value
+cat $outdir/$ID.map.fasta > $seg_ref
+# cat $outdir/$ID.map.fasta > $sample.contigs.fasta
+# cat $outdir/$ID.map.fasta >$sample.contigs.final.fasta
+
+
+# test_ref=/mnt/d/breakpoints/assembly/sim/database/Escherichia_coli/NZ_CP028685.1.fasta
+# bwa index $test_ref
+# samtools faidx $test_ref
+# bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $test_ref $fq1 $fq2 \
+#   | samtools view -bhS -> $sample.seg.unsort.bam
+# samtools sort -o $sample.seg.bam $sample.seg.unsort.bam
+# samtools index $sample.seg.bam
+# samtools depth -aa $sample.seg.bam >$sample.test.bam.depth
+
+
+python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
+gzip -f $sample.unmapped.*fq
 rm -r $outdir/ass
-echo "start spades..."
-echo "spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz  --isolate -o $outdir/ass >$sample.spades.log"  # -s $sample.unmapped.s.fq.gz
-spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz  --isolate -o $outdir/ass >$sample.spades.log  # -s $sample.unmapped.s.fq.gz
-python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 100
+echo "spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz  -o $outdir/ass >$sample.spades.log"  # -s $sample.unmapped.s.fq.gz
+spades.py -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --careful -o $outdir/ass  >$sample.spades.log  # -s $sample.unmapped.s.fq.gz --isolate
+python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 1000 5
 cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
-end=$(date +%s)
-take=$(( end - start ))
-echo two Time taken to map reads is ${take} seconds. # >> ${sample}.log
+# cat $seg_ref > $sample.contigs.final.fasta
+
+
+# cat $outdir/ass/contigs.filter.fasta >$sample.contigs.fasta
+
+# cat $seg_ref >$sample.contigs.fasta
+
+# cat $outdir/ass/contigs.filter.fasta >$sample.contigs.final.fasta
+
+# end=$(date +%s)
+# take=$(( end - start ))
+# echo two Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
 
 bwa index $seg_ref
@@ -58,13 +78,15 @@ python3 $dir/bam2graph.py $sample.seg.bam $sample.graph.txt $sample.seg.bam.dept
 # :<<!
 python3 $dir/plot_graph.py $sample.graph.txt $sample.plot.graph.pdf
 echo "matching..."
-# /home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
-python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
-end=$(date +%s)
-take=$(( end - start ))
-echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
+/home/wangshuai/softwares/seqGraph/build/matching -b --debug --model 1 -v 1 -g $sample.graph.txt -r $sample.solve.path.txt -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c
+# python3 $dir/skip_match_test.py $sample.graph.txt $sample.solve.path.txt
+# end=$(date +%s)
+# take=$(( end - start ))
+# echo three Time taken to map reads is ${take} seconds. # >> ${sample}.log
 
 python3 $dir/graph2contig.py $seg_ref $sample.solve.path.txt $sample.contigs.fasta
+
+
 
 ##### polish the cotigs
 bwa index $sample.contigs.fasta
@@ -77,17 +99,15 @@ end=$(date +%s)
 take=$(( end - start ))
 echo four Time taken to alignment to contigs is ${take} seconds. # >> ${sample}.log
 
-# !
-# pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --chunksize 500000
 java -Xmx8G -jar /home/wangshuai/softwares/pilon-1.24.jar --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.polish_1 --fix bases
 cp $sample.contigs.polish_1.fasta $sample.contigs.final.fasta
 
 
-minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
-minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf
+# minimap2 -c $truth $sample.contigs.final.fasta > $sample.contigs.final.fasta.paf
+# minidot $sample.contigs.final.fasta.paf > $sample.contigs.final.fasta.eps && epstopdf $sample.contigs.final.fasta.eps -o $sample.contigs.final.fasta.pdf
 
-minimap2 -c $truth $ref > $sample.paf
-minidot $sample.paf > $sample.eps && epstopdf $sample.eps -o $sample.truth.ref.pdf
+# minimap2 -c $truth $ref_db > $sample.paf
+# minidot $sample.paf > $sample.eps && epstopdf $sample.eps -o $sample.truth.ref.pdf
 
 
 

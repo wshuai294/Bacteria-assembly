@@ -1,0 +1,1 @@
+./mapping /home/wangshuai/assembly_result/mappingtest/GCF_921292975.1_V_hippocampi_CECT8226_genomic.fna /home/wangshuai/assembly_result/mappingtest/db/db.list 26 /home/wangshuai/assembly_result/mappingtest/test.out 3

@@ -13,13 +13,15 @@ import os
 original_assemblies = sys.argv[1]
 novel_assemblies = sys.argv[2]
 min_length = int(sys.argv[3])
+min_cov = int(sys.argv[4])
 
 
 def main():
     
     long_sequences = []  # Setup an empty list
     for record in SeqIO.parse(original_assemblies, "fasta"):
-        if len(record.seq) > min_length:
+        cov = float(record.id.split("_")[-1])
+        if len(record.seq) > min_length and cov > min_cov:
             # Add this record to our list
             long_sequences.append(record)
 
