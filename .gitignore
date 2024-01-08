@@ -8,3 +8,5 @@ seqGraph/
 #sim/
 scripts/segmentation
 test/output/
+#test/*.fastq
+#test/*.fastq.gz

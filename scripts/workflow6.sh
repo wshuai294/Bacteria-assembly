@@ -17,11 +17,13 @@ split_ref=$sample.split.fasta
 seg_ref=$sample.seg.fasta
 
 # :<<!
-$dir//src/continuous  $ref $fq1 $sample.read.tab 50
-python /mnt/d/breakpoints/assembly/scripts/src/find_continous.py $ref $sample.read.tab $sample.split.fasta 1000
-python $dir/filter_contig_by_len.py $sample.split.fasta $sample.split.filter.fasta 1000
+# $dir//src/continuous  $ref $fq1 $sample.read.tab 50
+# python /mnt/d/breakpoints/assembly/scripts/src/find_continous.py $ref $sample.read.tab $sample.split.fasta 1000
+# python $dir/filter_contig_by_len.py $sample.split.fasta $sample.split.filter.fasta 1000
 
-split_ref=$sample.split.filter.fasta
+python $dir/02_find_ref_segments.py -r $ref --fq1 $fq1 -s $ID -o $outdir
+
+split_ref=$sample.split.fasta
 
 $dir/../tools/novoindex $split_ref.ndx $split_ref
 samtools faidx $split_ref
