@@ -1,28 +1,37 @@
-large_interval = (0, 1000)
-small_intervals = [(200, 300), (400, 500), (600, 700)]
+from Bio import SeqIO
+from Bio.Blast import NCBIXML
+import subprocess
 
-# Sort the small intervals by their start points
-small_intervals = sorted(small_intervals)
+def remove_redundant_overlap(fasta_file, output_file):
+    # Read the FASTA file and store contig sequences
+    contigs = {}
+    for record in SeqIO.parse(fasta_file, "fasta"):
+        contigs[record.id] = record.seq
 
-# Create a list of intervals covering the full range of the large interval
-full_range = [(large_interval[0], large_interval[1])]
-new_intervals = []
-for interval in small_intervals:
-    # Remove any small intervals that are outside the large interval
-    if interval[0] >= large_interval[0] and interval[1] <= large_interval[1]:
-        # Split the full range into two parts at the end point of each small interval
-        new_intervals.extend([(large_interval[0], interval[0]), (interval[1], large_interval[1])])
-    # If the small interval overlaps with the previous interval, merge them
-    elif interval[0] < full_range[-1][1]:
-        full_range[-1] = (full_range[-1][0], max(full_range[-1][1], interval[1]))
-    # Otherwise, add the small interval to the new intervals list
-    else:
-        new_intervals.append((interval[0], interval[1]))
-    # Update the full range with the new intervals
-    full_range = merge_intervals(full_range, new_intervals)
+    # Perform BLAST alignment
+    blast_output = "/home/wangshuai/assembly_result/w6_ecoli/output.xml"
+    blast_cmd = f"blastn -subject {fasta_file} -query {fasta_file} -out {blast_output} -outfmt 5"
+    subprocess.run(blast_cmd, shell=True, check=True)
 
-# The result is the union of all the intervals in the full range list
-result = [(interval[0], interval[1]) for interval in full_range]
+    # Parse BLAST output XML
+    with open(blast_output, "r") as blast_file:
+        blast_records = NCBIXML.parse(blast_file)
+        for blast_record in blast_records:
+            query_id = blast_record.query
+            for alignment in blast_record.alignments:
+                hit_id = alignment.hit_id
+                if hit_id != query_id:
+                    hit_start = alignment.hsps[0].sbjct_start
+                    hit_end = alignment.hsps[0].sbjct_end
+                    contigs[hit_id] = contigs[hit_id][hit_start-1:]
 
+    # Write updated contigs to a new FASTA file
+    with open(output_file, "w") as file:
+        for contig_id, sequence in contigs.items():
+            file.write(f">{contig_id}\n")
+            file.write(f"{sequence}\n")
 
-print (result)
+# Example usage
+fasta_file = "/home/wangshuai/assembly_result/w6_ecoli/NZ_AP022525.1.seg.fasta"
+output_file = "/home/wangshuai/assembly_result/w6_ecoli/output.fasta"
+remove_redundant_overlap(fasta_file, output_file)

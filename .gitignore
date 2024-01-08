@@ -3,7 +3,8 @@ bi_matching/
 htslib/
 lemon-1.3.1/
 seqGraph/
-seqGraph_before_11_17/
-speedseq/
+#seqGraph_before_11_17/
+#speedseq/
 sim/
 scripts/segmentation
+test/

@@ -23,7 +23,8 @@ mkdir $outdir
 map_qual=20
 threads=15
 
-# :<<!
+
+
 bwa index $ref
 samtools faidx $ref
 bwa mem -t $threads -R "@RG\tID:id\tSM:sample\tLB:lib" $ref $fq1 $fq2 \

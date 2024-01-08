@@ -8,9 +8,9 @@ import re
 origin_ref = sys.argv[1]
 clean_ref = sys.argv[2]
 blast_file = sys.argv[3]
-min_repeat_len = 30
+min_repeat_len = 100
 end_gap = 20
-repeat_cutoff = 0.85
+repeat_cutoff = 0.95
 
 
 def read_blast():

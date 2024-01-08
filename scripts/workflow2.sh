@@ -25,8 +25,10 @@ threads=15
 
 
 # :<<!
-$dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 60 $ID 0.8  ## 0.95 is a normal value
+# $dir/segmentation $fq1 $fq2 $ref_db 26 10 10 $outdir 60 $ID 0.8  ## 0.95 is a normal value
 cat $outdir/$ID.map.fasta > $seg_ref
+
+
 # cat $outdir/$ID.map.fasta > $sample.contigs.fasta
 # cat $outdir/$ID.map.fasta >$sample.contigs.final.fasta
 
@@ -41,13 +43,13 @@ cat $outdir/$ID.map.fasta > $seg_ref
 # samtools depth -aa $sample.seg.bam >$sample.test.bam.depth
 
 
-python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
-gzip -f $sample.unmapped.*fq
-rm -r $outdir/ass
-echo "spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz  -o $outdir/ass >$sample.spades.log"  # -s $sample.unmapped.s.fq.gz
-spades.py -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --careful -o $outdir/ass  >$sample.spades.log  # -s $sample.unmapped.s.fq.gz --isolate
-python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 1000 5
-cat $outdir/ass/contigs.filter.fasta >>$seg_ref
+# python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir $ID
+# gzip -f $sample.unmapped.*fq
+# rm -r $outdir/ass
+# echo "spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz  -o $outdir/ass >$sample.spades.log"  # -s $sample.unmapped.s.fq.gz
+# spades.py -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz --careful -o $outdir/ass  >$sample.spades.log  # -s $sample.unmapped.s.fq.gz --isolate
+# python $dir/filter_assemblies.py $outdir/ass/contigs.fasta $outdir/ass/contigs.filter.fasta 1000 5
+# cat $outdir/ass/contigs.filter.fasta >>$seg_ref
 
 # cat $seg_ref > $sample.contigs.final.fasta
 

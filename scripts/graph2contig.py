@@ -9,7 +9,6 @@ original_ref = sys.argv[1]
 graph_file = sys.argv[2]
 contigs = sys.argv[3]
 
-from Bio import SeqIO
 
 def get_contig_lengths(fasta_file):
     contig_lengths = {}
