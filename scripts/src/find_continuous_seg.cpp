@@ -128,9 +128,9 @@ void Encode::random_coder(int k){
     short permu[18] = {0,1,2,0,2,1,1,2,0,1,0,2,2,0,1,2,1,0};
     
     int r;
-    unsigned seed;
-    seed = time(0);
-    srand(seed);
+    // unsigned seed;
+    // seed = time(0);
+    // srand(seed);
     for (int j = 0; j < k; j++){
         r = rand() % 6;
         // cout << r << endl;
@@ -256,8 +256,52 @@ void read_ref(string ref_seq, Encode encoder)
     delete [] ref_comple_int;
 }
 
+long get_fq_start(ifstream& fq_file, long start){ // find the read name line of a fastq file
+    long pos = 0;
+    bool flag = false;
+    bool done = false;
+    int x = 0;
+    for (long i = start; i>0; i--){
 
-void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string out_file)
+        for (long j = i; j < i + 1000; j ++){
+            fq_file.seekg(j, ios::beg);
+            char chr1, chr2;
+            fq_file.get(chr1);
+            fq_file.get(chr2);
+
+            if (chr1 == '\n' and chr2 == '+'){ //third field
+                flag = true;
+                x = 0;
+            }  
+            if (flag) {
+                if (chr1 == '\n'){
+                    x += 1;
+                }
+                if (chr1 == '\n' and chr2 == '@' and x == 3){
+                    pos = j + 1;
+                    done = true;
+                    break;
+                }
+            }  
+            else{
+                if (chr1 == '\n'){
+                    x += 1;
+                }
+            }
+            if (x == 3){
+                break;
+            } 
+        }
+        cout <<  i << "\t" << pos <<endl; 
+        if (done){
+            break;
+        }
+    }
+    return pos;
+}
+
+
+void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string out_file, long start, long end)
 {
     time_t t0 = time(0);
     ifstream fq_file; 
@@ -277,11 +321,22 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
     int r ;
     short read_len = 0;
 
+    long pos = get_fq_start(fq_file, start);
+    fq_file.seekg(pos, ios::beg);
+    long add_size = start;
+
     while (getline(fq_file,reads_seq)){
+
+
+        if (add_size>=end){
+            break;
+        }
+        add_size += reads_seq.length() + 1;
+
         if (lines % 4 == 1){
             time_t t1 = time(0);
-            if (lines % 10000000 == 10000000-1){
-                cout <<lines<<"reads\t" << t1-t0 <<endl;
+            if (lines % 50000 == 1){
+                cout <<lines<<" reads " << t1-t0 <<endl;
             }
             read_len = reads_seq.length();//cal read length
             r = rand() % 100 ;
@@ -336,7 +391,12 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
     fq_file.close();
 }
 
-
+long file_size(string filename){  
+    struct stat statbuf;  
+    stat(filename.c_str(),&statbuf);  
+    long size=statbuf.st_size;   
+    return size;  
+}  
 
 int main( int argc, char *argv[])
 {
@@ -347,20 +407,15 @@ int main( int argc, char *argv[])
     Encode encoder;
     encoder.constructer(k);
 
-    // string reference = "/mnt/d/breakpoints/assembly/sim/database/Escherichia_coli/NZ_CP028685.1.fasta";
-    // string fastq_file = "/mnt/d/breakpoints/assembly/sim/standard/downsample/DRR198803_1_subsampled.fastq";
-
-    // string reference = "/mnt/d/breakpoints/assembly/sim/database/Escherichia_coli/NC_007779.1.fasta";
-    // string fastq_file = "/mnt/d/breakpoints/assembly/sim/standard/downsample/DRR198806_1_subsampled.fastq";
-    // string out_file = "/home/wangshuai/assembly_result/test.map.tab";
-
-
     string reference = argv[1];
     string fastq_file = argv[2];
     string out_file = argv[3];
     int down_sam_ratio = stod(argv[4]);
+    k = stod(argv[5]);
+    int thread_num = stod(argv[6]);
 
     // int down_sam_ratio = 50;
+
 
 
     Fasta fasta;
@@ -373,7 +428,28 @@ int main( int argc, char *argv[])
 
     read_ref(fasta.ref_seq, encoder);
     
-    read_fastq(fastq_file, encoder, down_sam_ratio, out_file);
+    // read_fastq(fastq_file, encoder, down_sam_ratio, out_file);
+
+
+    long size = file_size(fastq_file);
+    long each_size = size/thread_num;  
+    long start = 0;
+    long end = 0;
+    cout <<"reads file size:\t"<<size<<endl;
+    std::vector<std::thread>threads;
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".part.txt";
+        threads.push_back(thread(read_fastq, fastq_file, encoder, down_sam_ratio, part_outfile, start, end));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
+
 
 
 

@@ -27,7 +27,6 @@ def split_fasta(fasta_file, interval_list, output_file):
 
     SeqIO.write(output_records, output_file, "fasta")
 
-
 def merge_intervals(intervals):
     min_overlap_len = 1
     intervals.sort(key=lambda x: x[0])  # Sort intervals based on start time
@@ -41,7 +40,6 @@ def merge_intervals(intervals):
             merged.append(interval)
 
     return merged
-
 
 def collect_intervals(file):
     map_intervals = []
@@ -61,8 +59,8 @@ def collect_intervals(file):
         ref_pos = int(array[3])
         kmer_ambiguity = int(array[4])
 
-        # if kmer_ambiguity > 1:
-        #     continue
+        if kmer_ambiguity > 1:  # important
+            continue
         if ref_pos == 0:
             continue
         if line_index != my_read:
@@ -127,12 +125,14 @@ def collect_intervals(file):
                 my_read_interval[1] = start_array[0]   
     return map_intervals
 
-
 def kmer_process():
     command  = f"""
-    {sys.path[0]}/src/continuous {ref_file} {options.fq1} {kmer_count_file} {options.sample_ratio}
+    rm {kmer_count_file}_*.part.txt
+    {sys.path[0]}/src/continuous {ref_file} {options.fq1} {kmer_count_file} {best_sample_ratio} {options.k} {options.t}
+    cat {kmer_count_file}_*.part.txt > {kmer_count_file}
+    rm {kmer_count_file}_*.part.txt
     """
-    print (command)
+    # print (command)
     os.system(command)
 
 def check_input():
@@ -144,6 +144,34 @@ def check_input():
     if not os.path.exists(options.fq1):
         print ("Reference file: %s is not detected."%(options.fq1))
         sys.exit()
+
+
+
+
+def count_bases_fasta(fasta_file):
+    total_bases = 0
+
+    with open(fasta_file, "r") as fasta_handle:
+        for record in SeqIO.parse(fasta_handle, "fasta"):
+            total_bases += len(record.seq)
+
+    return total_bases
+
+def count_bases_fastq(fastq_file):
+    count = 0
+    with open(fastq_file, 'r') as file:
+        for line_num, line in enumerate(file):
+            if line_num % 4 == 1:  # Check the second line of each record
+                count += len(line.strip())
+    return count
+
+def estimate_sample_ratio(fasta_file, fastq_file):
+    # best depth 16x
+    est_depth = float(count_bases_fastq(fastq_file))/count_bases_fasta(fasta_file)
+    best_sample_ratio = round(options.sample_depth/est_depth * 100)
+    return best_sample_ratio
+
+
 
 if __name__ == "__main__":
 
@@ -158,8 +186,10 @@ if __name__ == "__main__":
     required.add_argument("-s", type=str, default="sample", help="<str> Sample name.", metavar="\b")
     required.add_argument("-o", type=str, default="./", help="<str> Output folder.", metavar="\b")
     optional.add_argument("-m", type=int, default=1000, help="<int> minimum segment length.", metavar="\b")
-
-    optional.add_argument("--sample_ratio", type=int, default=100, help="<0-100> sample ratio (%).", metavar="\b")
+    optional.add_argument("-k", type=int, default=26, help="<int> kmer length.", metavar="\b")
+    optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
+    optional.add_argument("--sample_depth", type=float, default=16, help="<float> only retain reads with this depth in downsampling.", metavar="\b")
+    # optional.add_argument("--sample_ratio", type=int, default=100, help="<0-100> sample ratio (%).", metavar="\b")
     optional.add_argument("-h", "--help", action="help")
 
     options = parser.parse_args()
@@ -176,6 +206,8 @@ if __name__ == "__main__":
         kmer_count_file = options.o + "/" + options.s + ".kmer.txt"
         minimum_seg_len = options.m
         out_file = options.o + "/" + options.s + ".split.fasta"
+        best_sample_ratio = estimate_sample_ratio(options.r, options.fq1)
+        print (f"sampling ratio is {best_sample_ratio}.")
 
         print ("start kmer matching...")
         kmer_process()
