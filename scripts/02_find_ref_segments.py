@@ -42,7 +42,7 @@ def merge_intervals(intervals):
 
     return merged
 
-def collect_intervals(file):
+def collect_intervals_bk(file): # consider kmer map and extract read map region
     map_intervals = []
 
     my_read = -1
@@ -126,6 +126,17 @@ def collect_intervals(file):
                 my_read_interval[1] = start_array[0]   
     return map_intervals
 
+def collect_intervals(file): ## direct read map interval
+    map_intervals = []
+    for line in open(file):
+        array = line.strip().split()
+        array[0] = int(array[0])
+        array[1] = int(array[1])
+        map_intervals.append(array)
+
+    return map_intervals
+
+
 def kmer_process():
     command  = f"""
     rm {kmer_count_file}_*.part.txt
@@ -189,7 +200,7 @@ if __name__ == "__main__":
     optional.add_argument("-m", type=int, default=1000, help="<int> minimum segment length.", metavar="\b")
     optional.add_argument("-k", type=int, default=26, help="<int> kmer length.", metavar="\b")
     optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
-    optional.add_argument("--sample_depth", type=float, default=16, help="<float> only retain reads with this depth in downsampling.", metavar="\b")
+    # optional.add_argument("--sample_depth", type=float, default=16, help="<float> only retain reads with this depth in downsampling.", metavar="\b")
     # optional.add_argument("--sample_ratio", type=int, default=100, help="<0-100> sample ratio (%).", metavar="\b")
     optional.add_argument("-h", "--help", action="help")
 
@@ -207,8 +218,9 @@ if __name__ == "__main__":
         kmer_count_file = options.o + "/" + options.s + ".kmer.txt"
         minimum_seg_len = options.m
         out_file = options.o + "/" + options.s + ".split.fasta"
-        best_sample_ratio = estimate_sample_ratio(options.r, options.fq1)
-        print (f"sampling ratio is {best_sample_ratio}.")
+        # best_sample_ratio = estimate_sample_ratio(options.r, options.fq1)
+        # print (f"sampling ratio is {best_sample_ratio}.")
+        best_sample_ratio = 101 # use all reads
 
         print ("start kmer matching...")
         kmer_process()

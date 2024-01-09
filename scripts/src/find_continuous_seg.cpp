@@ -26,6 +26,7 @@ const char coder_num = 3;
 int k = 26;
 int *kmer_position_table;
 char *kmer_pos_num_table;
+int max_diff = 30;
 
 
 class Encode{
@@ -44,6 +45,12 @@ class Encode{
     void random_coder(int k);
     void constructer(int given_k);
 
+};
+
+class Interval{
+    public:
+    int start, end;
+    bool valid = false;
 };
 
 void Encode::constructer(int given_k){
@@ -300,6 +307,69 @@ long get_fq_start(ifstream& fq_file, long start){ // find the read name line of 
     return pos;
 }
 
+Interval check_map(int* ref_pos_array, int max_index){ // check if a read map to a ref region
+    int min_map_len = 50;
+    Interval interval;
+    if (max_index < max_diff){
+        // cout << "too short read length" << endl;
+        return interval;
+    }
+    int start, end, s, e;
+    start=0;
+    end=0;
+    s=0;
+    e=0;
+    bool flag = false;
+    for (int i = 0; i < max_index - max_diff; i++){
+        if (ref_pos_array[i] == 0){
+            continue;
+        }
+        for (int j = max_diff; j < max_index; j++){
+            if (ref_pos_array[j] == 0){
+                continue;
+            }
+            int ref_diff = abs(ref_pos_array[j] - ref_pos_array[i]);
+            if (abs(ref_diff - abs(j-i)) < max_diff & ref_diff >= min_map_len){
+                // cout << j <<" read map region: " << ref_pos_array[j] << "\t" << ref_pos_array[i] << endl;
+
+                if (ref_pos_array[j] > ref_pos_array[i]){
+                    s = ref_pos_array[i];
+                    e = ref_pos_array[j];
+                }
+                else{
+                    s = ref_pos_array[j];
+                    e = ref_pos_array[i];                  
+                }
+                if (!flag){
+                    start = s;
+                    end = e;
+                    flag = true;
+                }
+                else{
+                    if (s < start){
+                        start = s;
+                    }
+                    if (e > end){
+                        end = e;
+                    }
+                }
+
+            }
+        }
+        if (flag){
+            break;
+        }
+    }
+    
+    if (flag){
+        // cout << "merge map region: " << start << "\t" << end << endl;
+        interval.valid = true;
+        interval.start = start;
+        interval.end = end;
+    }
+    return interval;
+    
+}
 
 void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string out_file, long start, long end)
 {
@@ -313,6 +383,7 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
     string reads_seq;
     int reads_int [500];
     int reads_comple_int [500];
+    int ref_pos_array [500]; // record the ref pos in each locus of the read
 
     unsigned int lines = 0;
     int m;
@@ -354,12 +425,15 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
                     reads_comple_int[j] = encoder.comple[reads_int[j]];
                 }
                 
-                for (int j = 0; j < read_len-encoder.k+1; j++){
-                    
+                for (int j = 0; j < read_len-encoder.k+1; j++){ // j: read index i: coder index 
+                    int ref_pos_coder [3]; // record the ref pos in each coder at a locus
+                    ref_pos_array[j] = 0; // initialize
+
                     for (int i = 0; i < 3; i++){
                         // cout <<j<<"hi"<<i<<endl;
                         kmer_index = 0;
                         comple_kmer_index = 0;
+                        ref_pos_coder[i] = 0; // initial
                         
                         bool all_valid = true;
                         // cout <<j<<"\t"<<i<<"\t"<<endl;
@@ -383,16 +457,31 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
                         if (all_valid == true ){
                             
                             // cout << lines<< " "<< j<< " " <<i << " "  <<(int)kmer_position_table[real_index] << "\t" << (int)kmer_pos_num_table[real_index] << endl;
-                            out << lines<< " "<< j<< " " <<i << " "  <<(int)kmer_position_table[real_index] << "\t" << (int)kmer_pos_num_table[real_index] << endl;
+                            // out << lines<< " "<< j<< " " <<i << " "  <<(int)kmer_position_table[real_index] << "\t" << (int)kmer_pos_num_table[real_index] << endl;
+                            if ((int)kmer_pos_num_table[real_index] == 1){ // unique kmer
+                                ref_pos_coder[i] = (int)kmer_position_table[real_index];
+                            }
                         }  
                     }
+
+                    if (ref_pos_coder[0] == ref_pos_coder[1] & ref_pos_coder[0] == ref_pos_coder[2]){ // three coders should map to a same ref pos
+                        ref_pos_array[j] = ref_pos_coder[0];
+                    }
+                }
+
+                Interval interval = check_map(ref_pos_array, read_len-encoder.k+1);
+                if (interval.valid){
+                    out << interval.start << "\t" << interval.end << endl;
                 }
             }         
         }
         lines++;
     }
     fq_file.close();
+    out.close();
 }
+
+
 
 long file_size(string filename){  
     struct stat statbuf;  
@@ -456,27 +545,24 @@ int main( int argc, char *argv[])
 		th.join();
     threads.clear();
 
-    // size = file_size(fastq_file_2);
-    // each_size = size/thread_num;  
-    // start = 0;
-    // end = 0;
-    // cout <<"second read file size:\t"<<size<<endl;
+    size = file_size(fastq_file_2);
+    each_size = size/thread_num;  
+    start = 0;
+    end = 0;
+    cout <<"second read file size:\t"<<size<<endl;
 
-    // for (int i=0; i<thread_num; i++){
-    //     start = i*each_size;
-    //     end = (i+1)*each_size;
-    //     if (i == thread_num-1){
-    //         end = size;
-    //     }
-    //     string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq2.part.txt";
-    //     threads.push_back(thread(read_fastq, fastq_file_2, encoder, down_sam_ratio, part_outfile, start, end));
-    // }
-	// for (auto&th : threads)
-	// 	th.join();
-    // threads.clear();
-
-
-
+    for (int i=0; i<thread_num; i++){
+        start = i*each_size;
+        end = (i+1)*each_size;
+        if (i == thread_num-1){
+            end = size;
+        }
+        string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq2.part.txt";
+        threads.push_back(thread(read_fastq, fastq_file_2, encoder, down_sam_ratio, part_outfile, start, end));
+    }
+	for (auto&th : threads)
+		th.join();
+    threads.clear();
 
     delete [] kmer_position_table;
     delete [] kmer_pos_num_table;
