@@ -62,7 +62,7 @@ def get_line_with_largest_value():
             if max_value is None or value > max_value:
                 max_value = value
                 max_line = line.strip()
-                
+
     best_file = open(f"{options.o}/{options.s}.selected.ref.txt", 'w')
     print (max_line, end = '', file = best_file)
     best_file.close()
@@ -98,5 +98,3 @@ if __name__ == "__main__":
         best_sample_ratio = estimate_sample_ratio(first_genome, options.fq1, options.sample_depth)
         print (f"sampling ratio is {best_sample_ratio}.")
         run()
-
-        # 
