@@ -9,6 +9,7 @@ from Bio.SeqRecord import SeqRecord
 import os
 import sys
 import argparse
+import numpy as np
 
 def split_fasta(fasta_file, interval_list, output_file):
     output_records = []
@@ -128,7 +129,7 @@ def collect_intervals(file):
 def kmer_process():
     command  = f"""
     rm {kmer_count_file}_*.part.txt
-    {sys.path[0]}/src/continuous {ref_file} {options.fq1} {kmer_count_file} {best_sample_ratio} {options.k} {options.t}
+    {sys.path[0]}/src/continuous {ref_file} {options.fq1} {options.fq2} {kmer_count_file} {best_sample_ratio} {options.k} {options.t}
     cat {kmer_count_file}_*.part.txt > {kmer_count_file}
     rm {kmer_count_file}_*.part.txt
     """
@@ -145,9 +146,6 @@ def check_input():
         print ("Reference file: %s is not detected."%(options.fq1))
         sys.exit()
 
-
-
-
 def count_bases_fasta(fasta_file):
     total_bases = 0
 
@@ -159,10 +157,13 @@ def count_bases_fasta(fasta_file):
 
 def count_bases_fastq(fastq_file):
     count = 0
+    read_lens = []
     with open(fastq_file, 'r') as file:
         for line_num, line in enumerate(file):
             if line_num % 4 == 1:  # Check the second line of each record
                 count += len(line.strip())
+                read_lens.append(len(line.strip()))
+    print ("read length mean is %s, median is %s."%(np.mean(read_lens), np.median(read_lens)))
     return count
 
 def estimate_sample_ratio(fasta_file, fastq_file):
@@ -182,7 +183,7 @@ if __name__ == "__main__":
     optional = parser.add_argument_group("optional arguments")
     required.add_argument("-r", type=str, help="<str> best-match reference file.", metavar="\b")
     required.add_argument("--fq1", type=str, help="<str> unzipped fastq 1 file.", metavar="\b")
-    # required.add_argument("--fq2", type=str, help="<str> unzipped fastq 2 file.", metavar="\b")
+    required.add_argument("--fq2", type=str, help="<str> unzipped fastq 2 file.", metavar="\b")
     required.add_argument("-s", type=str, default="sample", help="<str> Sample name.", metavar="\b")
     required.add_argument("-o", type=str, default="./", help="<str> Output folder.", metavar="\b")
     optional.add_argument("-m", type=int, default=1000, help="<int> minimum segment length.", metavar="\b")
@@ -222,5 +223,3 @@ if __name__ == "__main__":
         split_fasta(ref_file, merged, out_file)
         # print (total_len, len(merged))
         print ("extract %s segments, total length is %s bp."%(len(merged), total_len))
-
-    

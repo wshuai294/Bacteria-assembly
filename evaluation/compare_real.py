@@ -57,18 +57,20 @@ class Sample():
         self.NGA50 = None
         self.base_error = None
         self.misassemblies = None
-        self.cpu_time = None
-        self.max_PAM = None
+        self.fraction = None
+        self.cpu_time = 0
+        self.max_PAM = 0
         self.method = method
         self.true_fasta = true_fasta
         self.result_fasta = None
-        if self.method == "Our":
-            self.quast_dir = self.result_dir + "/quast_" + ID
-        elif self.method == "Spades":
+        if self.method == "Spades":
             self.quast_dir = self.result_dir + "/../quast_" + ID
-        elif self.method == "Ref":
-            self.quast_dir = self.result_dir + "/quast_ref_" + ID
-        self.get_time()
+        else:
+            self.quast_dir = self.result_dir + "/%s_quast"%(ID)
+        # elif self.method == "Ref":
+        #     self.quast_dir = self.result_dir + "/quast_ref_" + ID
+        if os.path.isfile(self.time_file):
+            self.get_time()
         # self.get_N50()
         self.run_quast()
 
@@ -81,6 +83,8 @@ class Sample():
             record = self.result_dir + "/" + self.ID + ".selected.ref.txt"
             f = open(record, 'r')
             self.result_fasta = f.readline().strip()
+        elif self.method == "Seg":
+            self.result_fasta = self.result_dir + "/" + self.ID + ".split.fasta"
         else:
             print ("No such methods")
         print (self.method, self.result_fasta)
@@ -98,10 +102,10 @@ class Sample():
         self.NGA50 = quast.NGA50
         self.base_error = quast.base_error
         self.misassemblies = quast.misassemblies
+        self.fraction = quast.fraction
 
         # print (quast.NGA50, quast.mismatch_rate, quast.indel_rate, quast.misassemblies)
 
-    
     def get_time(self):
         com = Com_Res(self.time_file)
         self.cpu_time = com.extract_time()
@@ -125,7 +129,7 @@ class Benchmark():
         self.true_fasta_dict = {}
         self.get_para(run_script)
         self.spades_dir = "/home/wangshuai/assembly_result/real_spades/"
-        self.our_dir = "/home/wangshuai/assembly_result/real_data/"
+        self.our_dir = "/home/wangshuai/assembly_result_v2/segment_result/"    #"/home/wangshuai/assembly_result/real_data/"
         self.data = []
         
 
@@ -145,21 +149,21 @@ class Benchmark():
             # if ID == "104":
             #     break
             print (ID)
-            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Our")
-            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Our", sample.misassemblies, sample.base_error])
+            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Seg")
+            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Seg", sample.misassemblies, sample.base_error, sample.fraction])
             # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Ref")
             # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Ref", sample.misassemblies, sample.base_error])
             sample = Sample(ID, self.spades_dir + "/" + ID, self.true_fasta_dict[ID], "Spades")
-            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Spades", sample.misassemblies, sample.base_error])
+            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Spades", sample.misassemblies, sample.base_error, sample.fraction])
             # break
 
-        self.df=pd.DataFrame(self.data, columns=['ID', 'NGA50','CPU_Time', 'Peak_RAM', 'Methods', "Misassemblies", "Base_Error(/100k)"])
+        self.df=pd.DataFrame(self.data, columns=['ID', 'NGA50','CPU_Time', 'Peak_RAM', 'Methods', "Misassemblies", "Base_Error(/100k)", "Fraction"])
         self.make_figures()
-        self.make_figures_test()
+        # self.make_figures_test()
 
     def make_figures(self):
 
-        fig, axes = plt.subplots(5, 2, gridspec_kw={'width_ratios': [9, 1]}, figsize=(60,18))
+        fig, axes = plt.subplots(6, 2, gridspec_kw={'width_ratios': [7, 1]}, figsize=(30,12))
         sns.barplot(ax = axes[0][0], x="ID",y='NGA50',hue= 'Methods',data=self.df, log=True)
         sns.boxplot(ax = axes[0][1], x="Methods",y='NGA50',data=self.df, showfliers =False, showmeans=True,meanprops={"marker":"o",
                        "markerfacecolor":"white", 
@@ -183,6 +187,11 @@ class Benchmark():
                       "markersize":"10"})
         sns.barplot(ax = axes[4][0], x="ID",y='Base_Error(/100k)',hue= 'Methods',data=self.df)
         sns.boxplot(ax = axes[4][1], x="Methods",y='Base_Error(/100k)',data=self.df, showmeans=True,meanprops={"marker":"o",
+                       "markerfacecolor":"white", 
+                       "markeredgecolor":"black",
+                      "markersize":"10"})
+        sns.barplot(ax = axes[5][0], x="ID",y='Fraction',hue= 'Methods',data=self.df)
+        sns.boxplot(ax = axes[5][1], x="Methods",y='Fraction',data=self.df, showmeans=True,meanprops={"marker":"o",
                        "markerfacecolor":"white", 
                        "markeredgecolor":"black",
                       "markersize":"10"})
@@ -250,6 +259,7 @@ class Quast():
         self.indel_rate = None
         self.base_error = None
         self.misassemblies = None
+        self.fraction = None
         self.read_report()
 
         # 
@@ -272,6 +282,8 @@ class Quast():
                 self.mismatch_rate = float(array[5])
             elif len(array) == 6 and array[1] == 'indels':
                 self.indel_rate = float(array[5])
+            elif len(array) == 4 and array[0] == 'Genome' and array[1] == 'fraction':
+                self.fraction = float(array[3])
             # print (array)
         f.close()
         self.base_error = self.mismatch_rate + self.indel_rate

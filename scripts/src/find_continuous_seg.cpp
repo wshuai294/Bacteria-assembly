@@ -292,7 +292,7 @@ long get_fq_start(ifstream& fq_file, long start){ // find the read name line of 
                 break;
             } 
         }
-        cout <<  i << "\t" << pos <<endl; 
+        // cout <<  i << "\t" << pos <<endl; 
         if (done){
             break;
         }
@@ -332,6 +332,9 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
             break;
         }
         add_size += reads_seq.length() + 1;
+        if (lines == 0){
+            cout << reads_seq << " read name " <<endl;
+        }
 
         if (lines % 4 == 1){
             time_t t1 = time(0);
@@ -404,17 +407,19 @@ int main( int argc, char *argv[])
     seed = 1;
     srand(seed);
 
-    Encode encoder;
-    encoder.constructer(k);
+
 
     string reference = argv[1];
     string fastq_file = argv[2];
-    string out_file = argv[3];
-    int down_sam_ratio = stod(argv[4]);
-    k = stod(argv[5]);
-    int thread_num = stod(argv[6]);
+    string fastq_file_2 = argv[3];
+    string out_file = argv[4];
+    int down_sam_ratio = stod(argv[5]);
+    k = stod(argv[6]);
+    int thread_num = stod(argv[7]);
 
     // int down_sam_ratio = 50;
+    Encode encoder;
+    encoder.constructer(k);
 
 
 
@@ -427,6 +432,7 @@ int main( int argc, char *argv[])
     memset(kmer_pos_num_table, 0, sizeof(kmer_pos_num_table));
 
     read_ref(fasta.ref_seq, encoder);
+    cout <<"ref is loaded."<<endl;
     
     // read_fastq(fastq_file, encoder, down_sam_ratio, out_file);
 
@@ -435,7 +441,7 @@ int main( int argc, char *argv[])
     long each_size = size/thread_num;  
     long start = 0;
     long end = 0;
-    cout <<"reads file size:\t"<<size<<endl;
+    cout <<"first read file size:\t"<<size<<endl;
     std::vector<std::thread>threads;
     for (int i=0; i<thread_num; i++){
         start = i*each_size;
@@ -443,12 +449,31 @@ int main( int argc, char *argv[])
         if (i == thread_num-1){
             end = size;
         }
-        string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".part.txt";
+        string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq1.part.txt";
         threads.push_back(thread(read_fastq, fastq_file, encoder, down_sam_ratio, part_outfile, start, end));
     }
 	for (auto&th : threads)
 		th.join();
     threads.clear();
+
+    // size = file_size(fastq_file_2);
+    // each_size = size/thread_num;  
+    // start = 0;
+    // end = 0;
+    // cout <<"second read file size:\t"<<size<<endl;
+
+    // for (int i=0; i<thread_num; i++){
+    //     start = i*each_size;
+    //     end = (i+1)*each_size;
+    //     if (i == thread_num-1){
+    //         end = size;
+    //     }
+    //     string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq2.part.txt";
+    //     threads.push_back(thread(read_fastq, fastq_file_2, encoder, down_sam_ratio, part_outfile, start, end));
+    // }
+	// for (auto&th : threads)
+	// 	th.join();
+    // threads.clear();
 
 
 
