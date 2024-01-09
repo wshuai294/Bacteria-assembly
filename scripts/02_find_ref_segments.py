@@ -177,10 +177,10 @@ def count_bases_fastq(fastq_file):
     print ("read length mean is %s, median is %s."%(np.mean(read_lens), np.median(read_lens)))
     return count
 
-def estimate_sample_ratio(fasta_file, fastq_file):
+def estimate_sample_ratio(fasta_file, fastq_file, depth):
     # best depth 16x
     est_depth = float(count_bases_fastq(fastq_file))/count_bases_fasta(fasta_file)
-    best_sample_ratio = round(options.sample_depth/est_depth * 100)
+    best_sample_ratio = round(depth/est_depth * 100)
     return best_sample_ratio
 
 
@@ -188,7 +188,7 @@ def estimate_sample_ratio(fasta_file, fastq_file):
 if __name__ == "__main__":
 
 
-    parser = argparse.ArgumentParser(description="Detect HGT breakpoints from metagenomics sequencing data.", add_help=False, \
+    parser = argparse.ArgumentParser(description="Find the reference segments that might present in the sample.", add_help=False, \
     usage="%(prog)s -h", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     required = parser.add_argument_group("required arguments")
     optional = parser.add_argument_group("optional arguments")
@@ -218,7 +218,7 @@ if __name__ == "__main__":
         kmer_count_file = options.o + "/" + options.s + ".kmer.txt"
         minimum_seg_len = options.m
         out_file = options.o + "/" + options.s + ".split.fasta"
-        # best_sample_ratio = estimate_sample_ratio(options.r, options.fq1)
+        # best_sample_ratio = estimate_sample_ratio(options.r, options.fq1, options.sample_depth)
         # print (f"sampling ratio is {best_sample_ratio}.")
         best_sample_ratio = 101 # use all reads
 
