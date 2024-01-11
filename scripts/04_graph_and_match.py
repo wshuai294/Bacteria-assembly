@@ -8,6 +8,9 @@ import os
 import argparse
 import time
 from Bio import SeqIO
+import networkx as nx
+import matplotlib.pyplot as plt
+import matplotlib
 
 from module_alignment import alignment
 
@@ -259,7 +262,80 @@ def get_seg_len(chrom_copy):
     # print (seg_length_dict)
     return seg_length_dict
 
+def plot_graph(graph_file, figure_file):
+    g = open(graph_file)
+    nodes_list = []
+    edges_list = []
+    first_partition_nodes = []
+    first_partition_segs = {}
+    for line in g:  
+        array = line.strip().split()
+        if array[0] == "SEG":
+            continue
+        seg1 = array[1]
+        node1 = array[1] + array[2]
+        seg2 = array[3]
+        node2 = array[3] + array[4]
+        if seg1 not in first_partition_segs and seg2 not in first_partition_segs:
+            first_partition_segs[seg1] = 1
+            first_partition_nodes.append(node1)
+        elif seg1 in first_partition_segs:
+            first_partition_nodes.append(node1)
+        elif seg2 in first_partition_segs:
+            first_partition_nodes.append(node2)           
+        else:
+            print ("both in the same side")
+        nodes_list += [node1, node2]
+        edges_list.append(tuple([node1, node2]))
+    first_partition_nodes = sorted(first_partition_nodes)
+    DG = nx.Graph()
+    # DG = nx.DiGraph()
+    DG.add_nodes_from(nodes_list)
+    DG.nodes()
+    print (len(edges_list), len(list(DG)), len(nodes_list))
 
+    DG.add_edges_from(edges_list, weight = 0.1)
+    
+    pos = nx.spring_layout(DG, seed=8)    
+    # pos = nx.planar_layout(DG) 
+    # pos = nx.kamada_kawai_layout(DG) 
+    # nx.draw(DG, pos, with_labels=True, node_size=50, width=1, font_size=5)
+    options = {
+    'node_color': 'blue',
+    'node_size': 2,
+    'width': 0.2,
+    'font_size': 2,
+    'arrowstyle': '-|>',
+    'arrowsize': 2,
+    'alpha': 0.5,
+    }
+    nx.draw_networkx(DG, pos, arrows=True, **options)
+
+    plt.savefig(figure_file)
+    DG.clear()
+    g.close()
+
+
+def run_match():
+    cmd = f"""
+        sample={options.o}/{options.s}
+        dir={sys.path[0]}
+
+        {options.match_tool} -b --model 1 -v 1 -g $sample.split.graph -r $sample.solve.path.txt \
+        -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c 
+        python3 $dir/graph2contig.py {options.seg_ref} $sample.solve.path.txt $sample.contigs.fasta
+    """
+    os.system(cmd)
+
+def refine_assembly():
+    raw_contig = f"{options.o}/{options.s}.contigs.fasta"
+    bam_prefix = f"{options.o}/{options.s}.contigs"
+    alignment(options.align_tool, raw_contig, options.fq1, options.fq2, bam_prefix, options.t)
+    cmd = f"""
+    sample={options.o}/{options.s}
+    pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.refine --chunksize 1000000
+    """
+    os.system(cmd)
 
 if __name__ == "__main__":
 
@@ -274,7 +350,9 @@ if __name__ == "__main__":
     required.add_argument("-o", type=str, default="./", help="<str> Output folder.", metavar="\b")
 
     optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
+    optional.add_argument("-p", type=int, default=0, help="<0/1> whether refine the contigs with Pilon.", metavar="\b")
     optional.add_argument("--align_tool", type=str, default="novoalign", help="alignment method, novoalign or bwa.", metavar="\b")
+    optional.add_argument("--match_tool", type=str, default="matching", help="the matching software, default is in system env.", metavar="\b")
     optional.add_argument("-h", "--help", action="help")
 
     options = parser.parse_args()
@@ -305,4 +383,16 @@ if __name__ == "__main__":
         calCrossReads(bam_name, split_graph, 'split')
         calCrossReads(bam_name, pair_graph, 'pair')
 
+        # plot_graph(split_graph, split_graph+".pdf")
+        # plot_graph(pair_graph, pair_graph+".pdf")
+
         print ("graphs constructed, stored in %s and %s"%(split_graph, pair_graph))
+        print ("start matching...")
+        run_match()
+        print ("assembly result is in %s"%(options.o + "/" + options.s + ".contigs.fasta"))
+        if options.p == 1:
+            print ("refine the contigs...")
+            refine_assembly()
+            print ("refined assembly result is in %s"%(options.o + "/" + options.s + ".contigs.refine.fasta"))
+
+            
