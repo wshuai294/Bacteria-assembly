@@ -11,7 +11,7 @@ import sys
 import argparse
 import numpy as np
 
-def split_fasta(fasta_file, interval_list, output_file):
+def split_fasta(fasta_file, interval_list, output_file): # currently only consider one contig
     output_records = []
 
     for record in SeqIO.parse(fasta_file, "fasta"):
@@ -25,11 +25,12 @@ def split_fasta(fasta_file, interval_list, output_file):
             split_id = f"{seq_id}:{start}-{end}"
             split_record = SeqRecord(Seq(split_sequence), id=split_id, description="")
             output_records.append(split_record)
+        break 
 
     SeqIO.write(output_records, output_file, "fasta")
 
 def merge_intervals(intervals):
-    min_overlap_len = 1
+    min_overlap_len = -options.distance # 1
     intervals.sort(key=lambda x: x[0])  # Sort intervals based on start time
     merged = [intervals[0]]
 
@@ -157,31 +158,20 @@ def check_input():
         print ("Reference file: %s is not detected."%(options.fq1))
         sys.exit()
 
-def count_bases_fasta(fasta_file):
-    total_bases = 0
-
-    with open(fasta_file, "r") as fasta_handle:
-        for record in SeqIO.parse(fasta_handle, "fasta"):
-            total_bases += len(record.seq)
-
-    return total_bases
-
-def count_bases_fastq(fastq_file):
-    count = 0
-    read_lens = []
-    with open(fastq_file, 'r') as file:
-        for line_num, line in enumerate(file):
-            if line_num % 4 == 1:  # Check the second line of each record
-                count += len(line.strip())
-                read_lens.append(len(line.strip()))
-    print ("read length mean is %s, median is %s."%(np.mean(read_lens), np.median(read_lens)))
-    return count
-
-def estimate_sample_ratio(fasta_file, fastq_file, depth):
-    # best depth 16x
-    est_depth = float(count_bases_fastq(fastq_file))/count_bases_fasta(fasta_file)
-    best_sample_ratio = round(depth/est_depth * 100)
-    return best_sample_ratio
+def extract_intervals(interval_list):
+    extracted_intervals = []
+    n = len(interval_list)
+    
+    # Extract intervals between the given intervals
+    for i in range(n - 1):
+        curr_interval = interval_list[i]
+        next_interval = interval_list[i + 1]
+        
+        # Check if there is a gap between the current and next interval
+        if curr_interval[1] < next_interval[0]:
+            extracted_intervals.append((curr_interval[1], next_interval[0]))
+    
+    return extracted_intervals
 
 
 
@@ -200,6 +190,7 @@ if __name__ == "__main__":
     optional.add_argument("-m", type=int, default=1000, help="<int> minimum segment length.", metavar="\b")
     optional.add_argument("-k", type=int, default=26, help="<int> kmer length.", metavar="\b")
     optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
+    optional.add_argument("--distance", type=int, default=10, help="<int> merge two interval with distance shorted than this value.", metavar="\b")
     # optional.add_argument("--sample_depth", type=float, default=16, help="<float> only retain reads with this depth in downsampling.", metavar="\b")
     # optional.add_argument("--sample_ratio", type=int, default=100, help="<0-100> sample ratio (%).", metavar="\b")
     optional.add_argument("-h", "--help", action="help")
@@ -228,6 +219,11 @@ if __name__ == "__main__":
         map_intervals = collect_intervals(kmer_count_file)
         print ("collected interval count", len(map_intervals))
         merged = merge_intervals(map_intervals)
+
+        # unmap_intervals = extract_intervals(merged)  # the unmap segments, for testing
+        # merged = merged + unmap_intervals
+        # merged.sort(key=lambda x: x[0]) 
+
         total_len = 0
         for interval in merged:
             total_len += (interval[1] - interval[0])

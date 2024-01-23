@@ -10,3 +10,4 @@ scripts/segmentation
 test/output/
 #test/*.fastq
 #test/*.fastq.gz
+test/NZ_CP028685.1.fasta*

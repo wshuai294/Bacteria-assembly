@@ -67,6 +67,10 @@ class Sample():
             self.quast_dir = self.result_dir + "/../quast_" + ID
         elif self.method == "unmap":
             self.quast_dir = self.result_dir + "/%s_quast_03"%(ID)
+        elif self.method == "match":
+            self.quast_dir = self.result_dir + "/%s_quast_04"%(ID)
+        elif self.method == "ragtag":
+            self.quast_dir = self.result_dir + "/%s_ragtag"%(ID)
         else:
             self.quast_dir = self.result_dir + "/%s_quast"%(ID)
         # elif self.method == "Ref":
@@ -89,6 +93,10 @@ class Sample():
             self.result_fasta = self.result_dir + "/" + self.ID + ".split.fasta"
         elif self.method == "unmap":
             self.result_fasta = self.result_dir + "/" + self.ID + ".segment.fasta"
+        elif self.method == "match":
+            self.result_fasta = self.result_dir + "/" + self.ID + ".contigs.fasta"
+        elif self.method == "ragtag":
+            self.result_fasta = self.result_dir + "/ragtag_" + self.ID + "/ragtag.scaffold.fasta"
         else:
             print ("No such methods")
         print (self.method, self.result_fasta)
@@ -153,11 +161,15 @@ class Benchmark():
             # if ID == "104":
             #     break
             print (ID)
-            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Seg")
-            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Seg", sample.misassemblies, sample.base_error, sample.fraction])
+            # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Seg")
+            # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Seg", sample.misassemblies, sample.base_error, sample.fraction])
 
-            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "unmap")
-            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "unmap", sample.misassemblies, sample.base_error, sample.fraction])
+            # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "unmap")
+            # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "unmap", sample.misassemblies, sample.base_error, sample.fraction])
+            # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "match")
+            # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "match", sample.misassemblies, sample.base_error, sample.fraction])
+            sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "ragtag")
+            self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "ragtag", sample.misassemblies, sample.base_error, sample.fraction])
             # sample = Sample(ID, self.our_dir, self.true_fasta_dict[ID], "Ref")
             # self.data.append([sample.ID, sample.NGA50, sample.cpu_time, sample.max_PAM, "Ref", sample.misassemblies, sample.base_error])
             sample = Sample(ID, self.spades_dir + "/" + ID, self.true_fasta_dict[ID], "Spades")

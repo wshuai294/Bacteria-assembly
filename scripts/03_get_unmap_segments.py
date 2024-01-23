@@ -44,7 +44,9 @@ def run():
     spades.py --isolate -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz -o $assembly_dir >$sample.spades.log
 
     if [ -f "$assembly_dir/contigs.fasta" ]; then
-        python $dir/filter_assemblies.py $assembly_dir/contigs.fasta $assembly_dir/contigs.filter.fasta 100 10
+        # cat $assembly_dir/contigs.fasta >>$seg_ref
+        python $dir/filter_assemblies.py $assembly_dir/contigs.fasta $assembly_dir/contigs.filter.fasta {options.m} 10
+        cat $assembly_dir/contigs.filter.fasta >>$seg_ref
         # contig=$assembly_dir/contigs.filter.fasta
         # $dir/../tools/novoindex $contig.ndx $contig
         # samtools faidx $contig
@@ -59,23 +61,23 @@ def run():
 
     """
     os.system(command)
-    filter_contig = f"{options.o}/{options.s}_assembly/contigs.filter.fasta"
-    if os.path.isfile(filter_contig):
-        bam_prefix = f"{options.o}/{options.s}.contig" 
-        alignment(options.align_tool, filter_contig, options.fq1, options.fq2, bam_prefix, options.t)
-        cmd = f"""
-        dir={sys.path[0]}
-        assembly_dir={options.o}/{options.s}_assembly
-        contig=$assembly_dir/contigs.filter.fasta
-        seg_ref={options.o}/{options.s}.segment.fasta
-        sample={options.o}/{options.s}
+    # filter_contig = f"{options.o}/{options.s}_assembly/contigs.filter.fasta"
+    # if os.path.isfile(filter_contig):
+    #     bam_prefix = f"{options.o}/{options.s}.contig" 
+    #     alignment(options.align_tool, filter_contig, options.fq1, options.fq2, bam_prefix, options.t)
+    #     cmd = f"""
+    #     dir={sys.path[0]}
+    #     assembly_dir={options.o}/{options.s}_assembly
+    #     contig=$assembly_dir/contigs.filter.fasta
+    #     seg_ref={options.o}/{options.s}.segment.fasta
+    #     sample={options.o}/{options.s}
 
-        python $dir/find_INS_breakpoints.py $sample.contig.bam $contig $assembly_dir/contigs.splitted.fasta
-        cat $assembly_dir/contigs.splitted.fasta >>$seg_ref
-        """
-        os.system(cmd)
-    else:
-        print ("no assembled contigs")
+    #     python $dir/find_INS_breakpoints.py $sample.contig.bam $contig $assembly_dir/contigs.splitted.fasta
+    #     cat $assembly_dir/contigs.splitted.fasta >>$seg_ref
+    #     """
+    #     os.system(cmd)
+    # else:
+    #     print ("no assembled contigs")
 
 
 
@@ -89,7 +91,7 @@ if __name__ == "__main__":
     required.add_argument("--fq2", type=str, help="<str> unzipped fastq 2 file.", metavar="\b")
     required.add_argument("-s", type=str, default="sample", help="<str> Sample name.", metavar="\b")
     required.add_argument("-o", type=str, default="./", help="<str> Output folder.", metavar="\b")
-
+    optional.add_argument("-m", type=int, default=1000, help="<int> minimum segment length.", metavar="\b")
     optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
     optional.add_argument("--align_tool", type=str, default="novoalign", help="alignment method, novoalign or bwa.", metavar="\b")
     optional.add_argument("-h", "--help", action="help")

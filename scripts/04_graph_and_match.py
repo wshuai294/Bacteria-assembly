@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from module_alignment import alignment
+from module_gene_graph import get_gene_graph
 
 def readFilter(read):
     return (read.is_proper_pair and
@@ -88,8 +89,8 @@ def calCrossReads(bam_name, graph, read_type="split"): # read_type: split or pai
             continue 
         if read.mapping_quality < min_q:
             continue
-        # if read.has_tag('XA'):
-        #     continue
+        if read.has_tag('XA'):
+            continue
         # if map_ratio(read) < min_map_ratio:
         #     continue
 
@@ -316,15 +317,27 @@ def plot_graph(graph_file, figure_file):
     g.close()
 
 
-def run_match():
-    cmd = f"""
-        sample={options.o}/{options.s}
-        dir={sys.path[0]}
+def run_match(gene_graph_flag):
+    ## https://github.com/panguangze/seqGraph/tree/single
+    if gene_graph_flag:
+        cmd = f"""
+            sample={options.o}/{options.s}
+            dir={sys.path[0]}
 
-        {options.match_tool} -b --model 1 -v 1 -g $sample.split.graph -r $sample.solve.path.txt \
-        -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c 
-        python3 $dir/graph2contig.py {options.seg_ref} $sample.solve.path.txt $sample.contigs.fasta
-    """
+            {options.match_tool} -b --model 1 -v 1 -g $sample.split.graph -r $sample.solve.path.txt \
+            -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c --gene_junc $sample.gene.graph.txt
+            python3 $dir/graph2contig.py {options.seg_ref} $sample.solve.path.txt $sample.contigs.fasta
+        """
+    else:
+        cmd = f"""
+            sample={options.o}/{options.s}
+            dir={sys.path[0]}
+
+            {options.match_tool} -b --model 1 -v 1 -g $sample.split.graph -r $sample.solve.path.txt \
+            -c $sample.solve.c.path.txt -m $sample.new.graph.txt --break_c 
+            python3 $dir/graph2contig.py {options.seg_ref} $sample.solve.path.txt $sample.contigs.fasta
+        """
+    print (cmd)
     os.system(cmd)
 
 def refine_assembly():
@@ -333,6 +346,7 @@ def refine_assembly():
     alignment(options.align_tool, raw_contig, options.fq1, options.fq2, bam_prefix, options.t)
     cmd = f"""
     sample={options.o}/{options.s}
+    samtools index $sample.contigs.bam
     pilon --genome $sample.contigs.fasta --frags $sample.contigs.bam --output $sample.contigs.refine --chunksize 1000000
     """
     os.system(cmd)
@@ -351,8 +365,10 @@ if __name__ == "__main__":
 
     optional.add_argument("-t", type=int, default=10, help="<int> number of threads.", metavar="\b")
     optional.add_argument("-p", type=int, default=0, help="<0/1> whether refine the contigs with Pilon.", metavar="\b")
+    optional.add_argument("-g", type=int, default=0, help="<0/1> whether use the info of the gene distance in reference genome.", metavar="\b")
+    required.add_argument("--ref_genome", type=str, help="<str> reference genome to get gene graph, fasta file.", metavar="\b")
     optional.add_argument("--align_tool", type=str, default="novoalign", help="alignment method, novoalign or bwa.", metavar="\b")
-    optional.add_argument("--match_tool", type=str, default="matching", help="the matching software, default is in system env.", metavar="\b")
+    optional.add_argument("--match_tool", type=str, default="/home/wangshuai/softwares/seqGraph/build/matching", help="the matching software, default is in system env.", metavar="\b")
     optional.add_argument("-h", "--help", action="help")
 
     options = parser.parse_args()
@@ -371,6 +387,9 @@ if __name__ == "__main__":
         pair_graph = options.o + "/" + options.s + ".pair.graph"  # graph constructed by paired-end reads
         bam_name = bam_prefix + ".bam"
         depth_file = bam_prefix + ".bam.depth"
+        gene_graph_flag = False
+        if options.g == 1 and options.ref_genome != '':
+            gene_graph_flag = True
         
         alignment(options.align_tool, options.seg_ref, options.fq1, options.fq2, bam_prefix, options.t)
         os.system(f"samtools depth -aa {bam_name} >{depth_file}")
@@ -383,12 +402,17 @@ if __name__ == "__main__":
         calCrossReads(bam_name, split_graph, 'split')
         calCrossReads(bam_name, pair_graph, 'pair')
 
-        # plot_graph(split_graph, split_graph+".pdf")
-        # plot_graph(pair_graph, pair_graph+".pdf")
+        plot_graph(split_graph, split_graph+".pdf")
+        plot_graph(pair_graph, pair_graph+".pdf")
 
         print ("graphs constructed, stored in %s and %s"%(split_graph, pair_graph))
+        if gene_graph_flag:
+            print ("get gene graph...")
+            get_gene_graph(options.ref_genome, options.seg_ref, options.o, options.s, options.t)
+
+
         print ("start matching...")
-        run_match()
+        run_match(gene_graph_flag)
         print ("assembly result is in %s"%(options.o + "/" + options.s + ".contigs.fasta"))
         if options.p == 1:
             print ("refine the contigs...")
