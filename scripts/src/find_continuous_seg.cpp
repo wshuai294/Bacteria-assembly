@@ -371,7 +371,7 @@ Interval check_map(int* ref_pos_array, int max_index){ // check if a read map to
     
 }
 
-void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string out_file, long start, long end)
+void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string out_file, long start, long end, string unmap_file)
 {
     time_t t0 = time(0);
     ifstream fq_file; 
@@ -380,10 +380,15 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
     ofstream out; 
     out.open(out_file);
 
+    ofstream unmap_fq_file;
+    unmap_fq_file.open(unmap_file, ios::out);
+    cout << unmap_file << endl;
+
     string reads_seq;
     int reads_int [500];
     int reads_comple_int [500];
     int ref_pos_array [500]; // record the ref pos in each locus of the read
+    string read_name;
 
     unsigned int lines = 0;
     int m;
@@ -405,6 +410,9 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
         add_size += reads_seq.length() + 1;
         if (lines == 0){
             cout << reads_seq << " read name " <<endl;
+        }
+        if (lines % 4 == 0){
+            read_name = get_read_ID(reads_seq).substr(1);
         }
 
         if (lines % 4 == 1){
@@ -473,12 +481,16 @@ void read_fastq(string fastq_file, Encode encoder, int down_sam_ratio, string ou
                 if (interval.valid){
                     out << interval.start << "\t" << interval.end << endl;
                 }
+                else{
+                    unmap_fq_file << read_name << endl;
+                }
             }         
         }
         lines++;
     }
     fq_file.close();
     out.close();
+    unmap_fq_file.close();
 }
 
 
@@ -539,7 +551,8 @@ int main( int argc, char *argv[])
             end = size;
         }
         string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq1.part.txt";
-        threads.push_back(thread(read_fastq, fastq_file, encoder, down_sam_ratio, part_outfile, start, end));
+        string unmap_outfile = out_file + "_fq1_part_" + to_string(start)+".txt";
+        threads.push_back(thread(read_fastq, fastq_file, encoder, down_sam_ratio, part_outfile, start, end, unmap_outfile));
     }
 	for (auto&th : threads)
 		th.join();
@@ -558,7 +571,8 @@ int main( int argc, char *argv[])
             end = size;
         }
         string part_outfile = out_file + "_" + to_string(start)+ "_" + to_string(end) + ".fq2.part.txt";
-        threads.push_back(thread(read_fastq, fastq_file_2, encoder, down_sam_ratio, part_outfile, start, end));
+        string unmap_outfile = out_file + "_fq2_part_" + to_string(start)+".txt";
+        threads.push_back(thread(read_fastq, fastq_file_2, encoder, down_sam_ratio, part_outfile, start, end, unmap_outfile));
     }
 	for (auto&th : threads)
 		th.join();

@@ -25,11 +25,11 @@ fqs = prefix + ".unmapped.s.fq"
 def combine_frag():
     # the c++ script genetates _part_ files for each thread
     # combine them and delete temp files.
-    cmd = f"""cat {prefix}_fq1_part_*.txt >{unmap_reads_file_fq1}
+    cmd = f"""cat {prefix}.kmer.txt_fq1_part_*.txt >{unmap_reads_file_fq1}
             #rm {prefix}_fq1_part_*.txt"""
     os.system(cmd)
 
-    cmd = f"""cat {prefix}_fq2_part_*.txt >{unmap_reads_file_fq2}
+    cmd = f"""cat {prefix}.kmer.txt_fq2_part_*.txt >{unmap_reads_file_fq2}
             #rm {prefix}_fq2_part_*.txt"""
     os.system(cmd)
 

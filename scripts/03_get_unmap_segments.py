@@ -16,8 +16,44 @@ import csv
 
 from module_alignment import alignment
 
+def run(): # use kmer
+    bam_prefix = f"{options.o}/{options.s}.split" 
 
-def run():
+    command = f"""
+    dir={sys.path[0]}
+    fq1={options.fq1}
+    fq2={options.fq2}
+    split_ref={options.genome}
+    threads={options.t}
+    sample={options.o}/{options.s}
+    outdir={options.o}
+    seg_ref={options.o}/{options.s}.segment.fasta
+    assembly_dir={options.o}/{options.s}_assembly
+
+    python $dir/classify_unmap_reads.py $fq1 $fq2 $outdir {options.s}
+    gzip -f $sample.unmapped.*fq
+    
+    cat $split_ref>$seg_ref
+
+    rm -r $assembly_dir
+    echo "start spades..."
+    spades.py -t $threads -1 $sample.unmapped.1.fq.gz -2 $sample.unmapped.2.fq.gz -s $sample.unmapped.s.fq.gz -o $assembly_dir >$sample.spades.log
+
+    if [ -f "$assembly_dir/contigs.fasta" ]; then
+
+        cat $assembly_dir/contigs.fasta >>$seg_ref
+        
+        # python $dir/filter_assemblies.py $assembly_dir/contigs.fasta $assembly_dir/contigs.filter.fasta {options.m} 10
+        # cat $assembly_dir/contigs.filter.fasta >>$seg_ref
+
+    else
+        echo "no assembled contigs"
+    fi
+
+    """
+    os.system(command)
+
+def run_alignment(): ## use mapping
     bam_prefix = f"{options.o}/{options.s}.split" 
     alignment(options.align_tool, options.genome, options.fq1, options.fq2, bam_prefix, options.t)
 
