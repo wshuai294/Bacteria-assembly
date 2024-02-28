@@ -1,13 +1,10 @@
 import pysam
 import sys
 
-inbam = sys.argv[1]
-outbam = sys.argv[2]
-q = int(sys.argv[3])
-# short_segs = sys.argv[4]
 
 
-def main():
+
+def main(inbam, outbam):
 
     samfile = pysam.AlignmentFile(inbam, "rb")
     filter_file = pysam.AlignmentFile(outbam, "wb", template=samfile)
@@ -19,6 +16,10 @@ def main():
         # because low quality may only indicate multiple alignments
         # so set quality cutoff may bring some multi-aligned reads
         if read.is_unmapped : 
+            filter_file.write(read)
+        if read.reference_name != read.next_reference_name:
+            filter_file.write(read)
+        if read.has_tag('SA'): 
             filter_file.write(read)
         # tags = read.get_tags()
         # if 'XA' in tags:
@@ -51,4 +52,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    inbam = sys.argv[1]
+    outbam = sys.argv[2]
+    # q = int(sys.argv[3])
+    # short_segs = sys.argv[4]
+    main(inbam, outbam)

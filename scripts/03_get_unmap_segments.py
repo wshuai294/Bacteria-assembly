@@ -33,7 +33,8 @@ def run():
     seg_ref={options.o}/{options.s}.segment.fasta
     assembly_dir={options.o}/{options.s}_assembly
 
-    samtools view -f 4 -b $sample.split.bam > $sample.unmap.bam
+    # samtools view -f 4 -b $sample.split.bam > $sample.unmap.bam
+    python $dir/extract_unmap.py $sample.split.bam $sample.unmap.bam
     samtools fastq -1 $sample.unmapped.1.fq -2 $sample.unmapped.2.fq -s $sample.unmapped.s.fq $sample.unmap.bam
     gzip -f $sample.unmapped.*fq
     
